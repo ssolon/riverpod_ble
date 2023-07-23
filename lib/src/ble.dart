@@ -65,9 +65,9 @@ class BleScanner extends _$BleScanner {
       final scannedDevices = results
           .map((r) => BleScannedDevice(
               BleDevice.scanned(
-                r.device.remoteId.str,
-                r.device.localName,
-                r.advertisementData.serviceUuids,
+                deviceId: r.device.remoteId.str,
+                name: r.device.localName,
+                services: r.advertisementData.serviceUuids,
               ),
               r.rssi,
               r.timeStamp))
