@@ -64,7 +64,11 @@ class BleScanner extends _$BleScanner {
     _resultsSubscription = fb.scanResults.listen((results) {
       final scannedDevices = results
           .map((r) => BleScannedDevice(
-              BleDevice.scanned(r.device.remoteId.str, r.device.localName),
+              BleDevice.scanned(
+                r.device.remoteId.str,
+                r.device.localName,
+                r.advertisementData.serviceUuids,
+              ),
               r.rssi,
               r.timeStamp))
           .toList();

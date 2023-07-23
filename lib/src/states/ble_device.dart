@@ -10,7 +10,8 @@ class BleDevice with _$BleDevice {
 
   factory BleDevice.connecting({required String id}) = Connecting;
 
-  factory BleDevice.scanned(String deviceId, String name) = Scanned;
+  factory BleDevice.scanned(
+      String deviceId, String name, List<String> services) = Scanned;
 
   factory BleDevice({
     required String deviceId,
