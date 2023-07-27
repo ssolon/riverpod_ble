@@ -7,7 +7,6 @@ part 'ble_device.freezed.dart';
 @freezed
 class BleDevice with _$BleDevice {
   factory BleDevice.initial() = Initial;
-
   factory BleDevice.connecting({required String deviceId}) = Connecting;
 
   factory BleDevice.scanned({
@@ -19,11 +18,13 @@ class BleDevice with _$BleDevice {
   factory BleDevice({
     required String deviceId,
     String? name,
-    required BleConnectionStatus status,
     @Default([]) List<Object> services,
+    required BleConnectionStatus status,
   }) = _BleDevice;
 
   factory BleDevice.error({
+    required String deviceId,
+    String? name,
     required Object error,
     StackTrace? stack,
   }) = Error;

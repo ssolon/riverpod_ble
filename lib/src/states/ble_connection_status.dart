@@ -9,5 +9,6 @@ class BleConnectionStatus with _$BleConnectionStatus {
   factory BleConnectionStatus.error(Object error, StackTrace? stackTrace) =
       Error;
   factory BleConnectionStatus.connected() = Connected;
+  factory BleConnectionStatus.disconnecting() = Disconnecting;
   factory BleConnectionStatus.disconnected() = Disconnected;
 }
