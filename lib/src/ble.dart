@@ -6,6 +6,7 @@ import 'package:riverpod_ble/src/states/ble_connection_status.dart';
 import 'package:simple_logger/simple_logger.dart';
 import 'states/ble_device.dart';
 import 'states/ble_scan_result.dart';
+import 'states/ble_service.dart';
 
 part 'ble.g.dart';
 
@@ -63,6 +64,9 @@ abstract class _Ble<T> {
   /// Connect to a device [deviceId]
   Future<void> connectTo(String deviceId);
 
+  /// Return the services for [deviceId]
+  Future<List<BleService>> servicesFor(String deviceId, String name);
+
   /// Disconnect from device
   Future<void> disconnectFrom(String deviceId, String name);
 }
@@ -119,6 +123,22 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
       native.disconnect();
     } catch (e) {
       return Future.error("disconnecFrom $id/$name error=$e");
+    }
+  }
+
+  @override
+  Future<List<BleService>> servicesFor(String deviceId, String name) async {
+    final native = deviceFor(deviceId, name);
+
+    try {
+      final services = await native.discoverServices();
+      final result = <BleService>[
+        for (var s in services) BleService(s.serviceUuid.toString()),
+      ];
+
+      return Future.value(result);
+    } catch (e) {
+      return Future.error("Error discovering services for $name/$deviceId=$e");
     }
   }
 }
@@ -263,5 +283,49 @@ class BleConnection extends _$BleConnection {
     } catch (e) {
       return Future.error("Error connecting to $deviceId/$name = $e");
     }
+  }
+}
+
+/*!!!!
+@riverpod
+Future<List<BleService>> bleServicesFor(
+    BleServicesForRef ref, String deviceId, String name) async {
+  final connection = ref.watch(bleConnectionProvider(deviceId, name));
+  return connection.map(
+    loading: ,
+    data: (data) => Future.value(data),
+   
+   Future.error(
+      "bleServicesFor deviceId=$deviceId is not implemented yet");
+}
+!!!!*/
+
+@riverpod
+class BleServicesFor extends _$BleServicesFor {
+  final _completer = Completer<List<BleService>>();
+
+  @override
+  FutureOr<List<BleService>> build(
+    String deviceId,
+    String? name,
+  ) async {
+    final connection = ref.watch(bleConnectionProvider(deviceId, name ?? ''));
+    connection.when(
+      loading: () {
+        state = const AsyncLoading();
+      },
+      data: (data) async {
+        // Connected, discover services
+        try {
+          _completer.complete(await _ble.servicesFor(deviceId, name ?? ''));
+        } catch (e) {
+          _completer.completeError(e);
+        }
+      },
+      // Error on connection
+      error: (error, stackTrace) => _completer.completeError(error, stackTrace),
+    );
+
+    return _completer.future;
   }
 }
