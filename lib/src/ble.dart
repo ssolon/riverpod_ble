@@ -4,9 +4,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:riverpod_ble/src/states/ble_connection_status.dart';
 import 'package:simple_logger/simple_logger.dart';
-import 'states/ble_device.dart';
+import 'package:riverpod_ble/riverpod_ble.dart';
 import 'states/ble_scan_result.dart';
-import 'states/ble_service.dart';
 
 part 'ble.g.dart';
 
@@ -87,7 +86,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
 
   @override
   Future<List<Object>> servicesOf(BluetoothDevice device) =>
-      device.services.toList();
+      device.servicesStream.toList();
 
   @override
   FutureOr<BleConnectionStatus> connectionStatusOf(
@@ -133,7 +132,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
     try {
       final services = await native.discoverServices();
       final result = <BleService>[
-        for (var s in services) BleService(s.serviceUuid.toString()),
+        for (var s in services) BleService(BleUUID(s.serviceUuid.toString())),
       ];
 
       return Future.value(result);
@@ -196,7 +195,9 @@ class BleScanner extends _$BleScanner {
             BleDevice.scanned(
               deviceId: r.device.remoteId.str,
               name: r.device.localName,
-              services: r.advertisementData.serviceUuids,
+              services: r.advertisementData.serviceUuids
+                  .map((e) => BleUUID(e))
+                  .toList(),
             ),
             r.rssi,
             r.timeStamp,

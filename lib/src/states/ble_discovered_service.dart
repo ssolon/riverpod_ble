@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:riverpod_ble/riverpod_ble.dart';
 
 part 'ble_discovered_service.freezed.dart';
 
@@ -14,6 +15,6 @@ class BleDiscoveredServices with _$BleDiscoveredServices {
 @freezed
 class BleDiscoveredService with _$BleDiscoveredService {
   factory BleDiscoveredService(
-          String deviceId, String serviceId, List<String> characteristics) =
+          String deviceId, BleUUID serviceId, List<String> characteristics) =
       _BleDiscoveredService;
 }

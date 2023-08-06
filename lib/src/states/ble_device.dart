@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'ble_uuid.dart';
 import 'ble_connection_status.dart';
 
 part 'ble_device.freezed.dart';
@@ -12,13 +13,13 @@ class BleDevice with _$BleDevice {
   factory BleDevice.scanned({
     required String deviceId,
     String? name,
-    @Default([]) List<String> services,
+    @Default([]) List<BleUUID> services,
   }) = Scanned;
 
   factory BleDevice({
     required String deviceId,
     String? name,
-    @Default([]) List<Object> services,
+    @Default([]) List<BleUUID> services,
     required BleConnectionStatus status,
   }) = _BleDevice;
 
