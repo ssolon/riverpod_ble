@@ -318,7 +318,8 @@ class BleServicesFor extends _$BleServicesFor {
       data: (data) async {
         // Connected, discover services
         try {
-          _completer.complete(await _ble.servicesFor(deviceId, name ?? ''));
+          final result = await _ble.servicesFor(deviceId, name ?? '');
+          _completer.complete(result);
         } catch (e) {
           _completer.completeError(e);
         }
