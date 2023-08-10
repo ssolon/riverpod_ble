@@ -6,6 +6,9 @@ part 'ble_service.freezed.dart';
 @freezed
 class BleService with _$BleService {
   factory BleService(
-    BleUUID uuid,
-  ) = _BleService;
+    String deviceId,
+    BleUUID serviceUuid,
+    List<BleCharacteristic> characteristics, {
+    @Default(false) bool isPrimary,
+  }) = _BleService;
 }

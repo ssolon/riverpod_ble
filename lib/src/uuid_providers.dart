@@ -45,7 +45,7 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
       return Future.value();
     } catch (e) {
       return Future.error(
-          "Exception loading uuid definitions from $yamlFilePath: $e");
+          "Exception loading uuid definitions from '$yamlFilePath': $e");
     }
   }
 
@@ -60,8 +60,7 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
 /// Either the name from a UUID definition for a short uuid that is known
 /// or the string version of the UUID.
 @riverpod
-Future<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
-  const servicesPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
+Future<String> nameFor(NameForRef ref, BleUUID bleUUID, String yamlPath) async {
   String result = bleUUID.str;
   final completer = Completer<String>();
 
@@ -69,13 +68,13 @@ Future<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
     // Try to lookup
     logger.fine("nameForService: short lookup uuid=$bleUUID");
     ref.listen(
-      uuidDefinitionsFromYamlProvider(servicesPath),
+      uuidDefinitionsFromYamlProvider(yamlPath),
       (previous, next) {
         logger.fine("nameForService: previous=$previous next=$next");
         next.map(
           data: (value) {
             final def = ref
-                .read(UuidDefinitionsFromYamlProvider(servicesPath).notifier)
+                .read(UuidDefinitionsFromYamlProvider(yamlPath).notifier)
                 .lookup(bleUUID.shortUUID ?? 0);
             if (def != null) {
               // We found a definition - use it
@@ -100,28 +99,57 @@ Future<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
 }
 
 @riverpod
-Future<String> nameForService2(NameForService2Ref ref, BleUUID bleUUID) async {
-  const servicesPath = 'files/yaml/service_uuids.yaml';
-  String result = bleUUID.str;
+Future<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
+  const servicesPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
   final completer = Completer<String>();
 
-  if (bleUUID.isShort) {
-    // Try to lookup
-    logger.fine("nameForService: short lookup uuid=$bleUUID");
-    final defs = ref.watch(uuidDefinitionsFromYamlProvider(servicesPath));
-    logger.fine("nameForService2: $defs");
-    final def = ref
-        .read(uuidDefinitionsFromYamlProvider(servicesPath).notifier)
-        .lookup(bleUUID.shortUUID ?? 0);
-    if (def != null) {
-      // We found a definition - use it
-      result = def.name;
-    }
-    completer.complete(result);
-  } else {
-    // Return long uuid from str
-    completer.complete(result);
-  }
+  ref.listen(
+    nameForProvider(bleUUID, servicesPath),
+    (prev, next) => next.when(
+      data: (data) => completer.complete(data),
+      error: (error, stack) => completer.completeError(error, stack),
+      loading: () => completer.future,
+    ),
+    fireImmediately: true,
+  );
+
+  return completer.future;
+}
+
+@riverpod
+Future<String> nameForCharacteristic(
+    NameForCharacteristicRef ref, BleCharacteristic characteristic) async {
+  const servicesPath =
+      'packages/riverpod_ble/files/yaml/characteristic_uuids.yaml';
+  final completer = Completer<String>();
+
+  ref.listen(
+    nameForProvider(characteristic.characteristicUuid, servicesPath),
+    (prev, next) => next.when(
+      data: (data) => completer.complete(data),
+      error: (error, stack) => completer.completeError(error, stack),
+      loading: () => completer.future,
+    ),
+    fireImmediately: true,
+  );
+
+  return completer.future;
+}
+
+@riverpod
+Future<String> nameForDescriptor(NameForDescriptorRef ref, BleUUID uuid) async {
+  const servicesPath = 'packages/riverpod_ble/files/yaml/descriptors.yaml';
+  final completer = Completer<String>();
+
+  ref.listen(
+    nameForProvider(uuid, servicesPath),
+    (prev, next) => next.when(
+      data: (data) => completer.complete(data),
+      error: (error, stack) => completer.completeError(error, stack),
+      loading: () => completer.future,
+    ),
+    fireImmediately: true,
+  );
 
   return completer.future;
 }

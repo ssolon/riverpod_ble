@@ -132,7 +132,43 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
     try {
       final services = await native.discoverServices();
       final result = <BleService>[
-        for (var s in services) BleService(BleUUID(s.serviceUuid.toString())),
+        for (final s in services)
+          BleService(
+            deviceId,
+            BleUUID(s.serviceUuid.toString()),
+            [
+              for (final c in s.characteristics)
+                BleCharacteristic(
+                  deviceId: deviceId,
+                  serviceUuid: BleUUID(c.serviceUuid.toString()),
+                  characteristicUuid: BleUUID(c.characteristicUuid.toString()),
+                  properties: BleCharacteristicProperties(
+                    broadcast: c.properties.broadcast,
+                    read: c.properties.read,
+                    writeWithoutResponse: c.properties.writeWithoutResponse,
+                    write: c.properties.write,
+                    notify: c.properties.notify,
+                    indicate: c.properties.indicate,
+                    authenticatedSignedWrites:
+                        c.properties.authenticatedSignedWrites,
+                    extendedProperties: c.properties.extendedProperties,
+                    notifyEncryptionRequired:
+                        c.properties.notifyEncryptionRequired,
+                    indicateEncryptionRequired:
+                        c.properties.indicateEncryptionRequired,
+                  ),
+                  descriptors: [
+                    for (final d in c.descriptors)
+                      BleDescriptor(
+                        deviceId: deviceId,
+                        serviceUuid: BleUUID(c.serviceUuid.toString()),
+                        characteristicUuid: BleUUID(c.uuid.toString()),
+                        descriptorUuid: BleUUID(d.descriptorUuid.toString()),
+                      ),
+                  ],
+                ),
+            ],
+          ),
       ];
 
       return Future.value(result);

@@ -76,7 +76,7 @@ void main() {
       addTearDown(container.dispose);
 
       final u = BleUUID('1a56b5ed-8c11-44de-b933-5580c9c053d9');
-      final name = await container.read(NameForServiceProvider(u).future);
+      final name = await container.read(nameForServiceProvider(u).future);
       expect(name, u.str, reason: 'Custom uuid name is full uuid');
     });
 
@@ -137,4 +137,64 @@ void main() {
     });
   });
   // TODO Add test nameForServiceProvider when yaml can't be loaded
+
+  group('Test characteristic name provider', () {
+    final tc = BleCharacteristic(
+      characteristicUuid: BleUUID('0653e86c-10b0-419b-8aeb-cc273d243663'),
+      deviceId: 'dummy',
+      serviceUuid: BleUUID('1a56b5ed-8c11-44de-b933-5580c9c053d9'),
+      properties: BleCharacteristicProperties(
+        broadcast: false,
+        read: false,
+        writeWithoutResponse: false,
+        write: false,
+        notify: false,
+        indicate: false,
+        authenticatedSignedWrites: false,
+        extendedProperties: false,
+        notifyEncryptionRequired: false,
+        indicateEncryptionRequired: false,
+      ),
+      descriptors: List.empty(),
+    );
+    test('Custom uuid lookup', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final name =
+          await container.read(nameForCharacteristicProvider(tc).future);
+      expect(name, tc.characteristicUuid.str,
+          reason: 'Custom uuid name is full uuid');
+    });
+
+    test('Known short uuid lookup', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final t = tc.copyWith(characteristicUuid: BleUUID.fromInt(0x2a19));
+      final name =
+          await container.read(nameForCharacteristicProvider(t).future);
+      expect(name, 'Battery Level', reason: 'Return definition');
+    });
+  });
+
+  group('Test descriptor name provider', () {
+    test('Custom uuid lookup', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final u = BleUUID('e2802510-567a-4cff-8379-dc6aa284790f');
+      final name = await container.read(nameForDescriptorProvider(u).future);
+      expect(name, u.str, reason: 'Custom returns original');
+    });
+
+    test('Known short uuid lookup', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final u = BleUUID.fromInt(0x2901);
+      final name = await container.read(nameForDescriptorProvider(u).future);
+      expect(name, 'Characteristic User Description');
+    });
+  });
 }
