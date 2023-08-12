@@ -10,9 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_blue_plus: ^1.8.7
+  flutter_blue_plus: ^1.14.7
   flutter_riverpod: ^2.2.0
   freezed_annotation: ^2.4.1
+  mutex: ^3.0.1
   riverpod_annotation: ^2.1.1
   simple_logger: ^1.9.0+2
   yaml: ^3.1.2
