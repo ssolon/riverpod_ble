@@ -6,7 +6,7 @@ import 'ble_connection_status.dart';
 part 'ble_device.freezed.dart';
 
 @freezed
-class BleDevice with _$BleDevice {
+class BleDevice<T> with _$BleDevice {
   factory BleDevice.initial() = Initial;
   factory BleDevice.connecting({required String deviceId}) = Connecting;
 
@@ -19,6 +19,7 @@ class BleDevice with _$BleDevice {
   factory BleDevice({
     required String deviceId,
     String? name,
+    required T nativeDevice,
     @Default([]) List<BleUUID> services,
     required BleConnectionStatus status,
   }) = _BleDevice;

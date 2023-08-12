@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:mutex/mutex.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:riverpod_ble/src/states/ble_connection_status.dart';
@@ -18,7 +20,7 @@ final _logger = SimpleLogger();
 
 /// Internal state for the Ble module
 /// Should be a singleton since it holds device states.
-abstract class _Ble<T> {
+abstract class _Ble<T, S, C, D> {
   /// Keep track of the devices we know about at their native type
   Map<String, T> devices = {};
 
@@ -43,7 +45,7 @@ abstract class _Ble<T> {
   FutureOr<BleConnectionStatus> connectionStatusOf(T native);
 
   /// Get the service (if present) from a native device
-  Future<List<Object>> servicesOf(T native);
+  Future<List<S>> servicesFrom(T native);
 
   /// Return the device for [deviceId] or create a new one
   T deviceFor(String deviceId, String? name) {
@@ -57,6 +59,7 @@ abstract class _Ble<T> {
   Future<BleDevice> bleDeviceFor(T native) async => BleDevice(
         deviceId: deviceIdOf(native),
         name: nameOf(native),
+        nativeDevice: native,
         status: await connectionStatusOf(native),
       );
 
@@ -68,10 +71,70 @@ abstract class _Ble<T> {
 
   /// Disconnect from device
   Future<void> disconnectFrom(String deviceId, String name);
+
+  BleService bleServiceFor(S nativeService);
+  BleUUID serviceUuidFrom(S nativeService);
+
+  Future<S> serviceFor(
+      BleUUID serviceUuid, String deviceId, String? name) async {
+    _logger.fine("serviceFor");
+    final nativeDevice = nativeFrom(deviceId: deviceId, name: name ?? '');
+    final services = await servicesFrom(nativeDevice);
+    final nativeService =
+        services.where((e) => serviceUuidFrom(e) == serviceUuid);
+    if (nativeService.isEmpty) {
+      throw UnknownService(serviceUuid, deviceId, name);
+    }
+
+    return Future.value(nativeService.toList().first);
+  }
+
+  List<C> characteristicsFrom(S nativeService);
+  BleUUID characteristicUuidFrom(C nativeCharacteristic);
+  BleCharacteristic bleCharacteristicFor(C nativeCharacteristic);
+
+  Future<C> characteristicFor(BleUUID characteristicUuid, BleUUID serviceUuid,
+      String deviceId, String? name) async {
+    _logger.fine("characteristicFor");
+    final nativeService = serviceFor(serviceUuid, deviceId, name);
+    final characteristics = characteristicsFrom(await nativeService);
+    final nativeCharacteristic = characteristics.where(
+      (element) => characteristicUuidFrom(element) == characteristicUuid,
+    );
+    if (nativeCharacteristic.isEmpty) {
+      throw UnknownCharacteristic(
+          characteristicUuid, serviceUuid, deviceId, name);
+    }
+
+    return Future.value(nativeCharacteristic.first);
+  }
+
+  List<D> descriptorsFrom(C nativeCharacteristic);
+  BleUUID descriptorUuidFrom(D nativeDescriptor);
+  BleDescriptor bleDescriptorFor(D nativeDescriptor);
+
+  Future<D> descriptorFor(BleUUID descriptorUuid, BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String? name) async {
+    final nativeCharacteristic =
+        characteristicFor(characteristicUuid, serviceUuid, deviceId, name);
+    final descriptors = descriptorsFrom(await nativeCharacteristic);
+
+    final nativeDescriptor = descriptors.where(
+      (element) => descriptorUuidFrom(element) == descriptorUuid,
+    );
+
+    if (nativeDescriptor.isEmpty) {
+      throw UnknownDescriptor(
+          descriptorUuid, characteristicUuid, serviceUuid, deviceId, name);
+    }
+
+    return Future.value(nativeDescriptor.first);
+  }
 }
 
 /// FlutterBluePlus variation
-class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
+class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
+    BluetoothCharacteristic, BluetoothDescriptor> {
   _FlutterBluePlusBle() {
     // TODO Make this settable somewhere
     // TODO This needs to happen after bluetooth is initialized?
@@ -85,8 +148,11 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
   String nameOf(BluetoothDevice device) => device.localName;
 
   @override
-  Future<List<Object>> servicesOf(BluetoothDevice device) =>
-      device.servicesStream.toList();
+  Future<List<BluetoothService>> servicesFrom(BluetoothDevice device) async {
+    _logger.fine("servicesFrom");
+    // return Future.value((await device.servicesStream.toList()).first);
+    return Future.value(device.servicesList);
+  }
 
   @override
   FutureOr<BleConnectionStatus> connectionStatusOf(
@@ -132,43 +198,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
     try {
       final services = await native.discoverServices();
       final result = <BleService>[
-        for (final s in services)
-          BleService(
-            deviceId,
-            BleUUID(s.serviceUuid.toString()),
-            [
-              for (final c in s.characteristics)
-                BleCharacteristic(
-                  deviceId: deviceId,
-                  serviceUuid: BleUUID(c.serviceUuid.toString()),
-                  characteristicUuid: BleUUID(c.characteristicUuid.toString()),
-                  properties: BleCharacteristicProperties(
-                    broadcast: c.properties.broadcast,
-                    read: c.properties.read,
-                    writeWithoutResponse: c.properties.writeWithoutResponse,
-                    write: c.properties.write,
-                    notify: c.properties.notify,
-                    indicate: c.properties.indicate,
-                    authenticatedSignedWrites:
-                        c.properties.authenticatedSignedWrites,
-                    extendedProperties: c.properties.extendedProperties,
-                    notifyEncryptionRequired:
-                        c.properties.notifyEncryptionRequired,
-                    indicateEncryptionRequired:
-                        c.properties.indicateEncryptionRequired,
-                  ),
-                  descriptors: [
-                    for (final d in c.descriptors)
-                      BleDescriptor(
-                        deviceId: deviceId,
-                        serviceUuid: BleUUID(c.serviceUuid.toString()),
-                        characteristicUuid: BleUUID(c.uuid.toString()),
-                        descriptorUuid: BleUUID(d.descriptorUuid.toString()),
-                      ),
-                  ],
-                ),
-            ],
-          ),
+        for (final s in services) bleServiceFor(s),
       ];
 
       return Future.value(result);
@@ -176,6 +206,113 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice> {
       return Future.error("Error discovering services for $name/$deviceId=$e");
     }
   }
+
+  @override
+  BleCharacteristic bleCharacteristicFor(BluetoothCharacteristic c) {
+    final deviceId = c.remoteId.str;
+
+    return BleCharacteristic(
+      deviceId: deviceId,
+      serviceUuid: BleUUID(c.serviceUuid.toString()),
+      characteristicUuid: BleUUID(c.characteristicUuid.toString()),
+      properties: BleCharacteristicProperties(
+        broadcast: c.properties.broadcast,
+        read: c.properties.read,
+        writeWithoutResponse: c.properties.writeWithoutResponse,
+        write: c.properties.write,
+        notify: c.properties.notify,
+        indicate: c.properties.indicate,
+        authenticatedSignedWrites: c.properties.authenticatedSignedWrites,
+        extendedProperties: c.properties.extendedProperties,
+        notifyEncryptionRequired: c.properties.notifyEncryptionRequired,
+        indicateEncryptionRequired: c.properties.indicateEncryptionRequired,
+      ),
+      descriptors: [
+        for (final d in c.descriptors) bleDescriptorFor(d),
+      ],
+    );
+  }
+
+  @override
+  BleDescriptor bleDescriptorFor(BluetoothDescriptor d) {
+    final deviceId = d.remoteId.str;
+    return BleDescriptor(
+      deviceId: deviceId,
+      serviceUuid: BleUUID(d.serviceUuid.toString()),
+      characteristicUuid: BleUUID(d.characteristicUuid.toString()),
+      descriptorUuid: BleUUID(d.descriptorUuid.toString()),
+    );
+  }
+
+  @override
+  BleService bleServiceFor(BluetoothService s) {
+    final deviceId = s.remoteId.str;
+    return BleService(
+      deviceId,
+      BleUUID(s.serviceUuid.toString()),
+      [for (final c in s.characteristics) bleCharacteristicFor(c)],
+    );
+  }
+
+  /// Getting errors with multiple descriptor reads from different services
+  /// so use a Mutex to restrict access to a single call at a time
+  /// TODO Find out if this is a bug or a "feature" of the underlying library
+  final readDescriptorMutex = Mutex();
+
+  /// Get the values for a descriptor
+  Future<List<int>> readDescriptor({
+    required String deviceId,
+    required String name,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+    required BleUUID descriptorUuid,
+  }) async {
+    // Only allow a single
+
+    _logger.fine('_ble: readDescriptor start');
+    final descriptor = await descriptorFor(
+        descriptorUuid, characteristicUuid, serviceUuid, deviceId, name);
+
+    try {
+      return await readDescriptorMutex.protect(() async {
+        _logger.fine('_ble: readDescriptor read start');
+        final values = await descriptor.read();
+        _logger.fine('_ble: readDescriptor done');
+        return Future.value(values);
+      });
+    } catch (e) {
+      return Future.error("Exception reading descriptor $descriptorUuid"
+          " for device=$deviceId/$name"
+          " service=$serviceUuid"
+          " characteristic=$characteristicUuid = $e");
+    }
+
+    return Future.value([]); // Should never happen but makes lint happy
+  }
+
+  @override
+  BleUUID characteristicUuidFrom(
+          BluetoothCharacteristic nativeCharacteristic) =>
+      BleUUID(nativeCharacteristic.uuid.toString());
+
+  @override
+  List<BluetoothCharacteristic> characteristicsFrom(
+          BluetoothService nativeService) =>
+      nativeService.characteristics;
+
+  @override
+  BleUUID descriptorUuidFrom(BluetoothDescriptor nativeDescriptor) =>
+      BleUUID(nativeDescriptor.descriptorUuid.toString());
+
+  @override
+  List<BluetoothDescriptor> descriptorsFrom(
+      BluetoothCharacteristic nativeCharacteristic) {
+    return nativeCharacteristic.descriptors;
+  }
+
+  @override
+  BleUUID serviceUuidFrom(BluetoothService nativeService) =>
+      BleUUID(nativeService.uuid.toString());
 }
 
 /// Scanner for BLE devices.
@@ -366,4 +503,90 @@ class BleServicesFor extends _$BleServicesFor {
 
     return _completer.future;
   }
+}
+
+/// Return the value of a descriptor
+@riverpod
+Future<List<int>> bleDescriptorValue(
+  BleDescriptorValueRef ref,
+  String deviceId,
+  String? name,
+  BleUUID serviceUuid,
+  BleUUID characteristicUuid,
+  BleUUID descriptorUuid,
+) async {
+  try {
+    _logger.fine("bleDescriptorValue: start");
+    return Future.value(await _ble.readDescriptor(
+        deviceId: deviceId,
+        name: name ?? '',
+        serviceUuid: serviceUuid,
+        characteristicUuid: characteristicUuid,
+        descriptorUuid: descriptorUuid));
+  } catch (e) {
+    return Future.error(e);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////
+/// Exceptions
+////////////////////////////////////////////////////////////////////////////
+
+/// Marker class for one our exceptions
+abstract class RiverpodBleException implements Exception {
+  const RiverpodBleException();
+}
+
+@immutable
+class UnknownService extends RiverpodBleException {
+  final BleUUID serviceUuid;
+  final String deviceId;
+  final String? name;
+
+  const UnknownService(this.serviceUuid, this.deviceId, this.name);
+
+  @override
+  String toString() =>
+      "Unknown service=$serviceUuid for device=$deviceId/$name";
+}
+
+@immutable
+class UnknownCharacteristic extends RiverpodBleException {
+  final BleUUID characteristicUuid;
+  final BleUUID serviceUuid;
+  final String deviceId;
+  final String? name;
+
+  const UnknownCharacteristic(
+    this.characteristicUuid,
+    this.serviceUuid,
+    this.deviceId,
+    this.name,
+  );
+
+  @override
+  String toString() => "Unknown characteristic=$characteristicUuid"
+      " service=$serviceUuid for device=$deviceId/$name";
+}
+
+@immutable
+class UnknownDescriptor extends RiverpodBleException {
+  final BleUUID descriptorUuid;
+  final BleUUID characteristicUuid;
+  final BleUUID serviceUuid;
+  final String deviceId;
+  final String? name;
+
+  const UnknownDescriptor(
+    this.descriptorUuid,
+    this.characteristicUuid,
+    this.serviceUuid,
+    this.deviceId,
+    this.name,
+  );
+
+  @override
+  String toString() => "Unknown descriptor=$descriptorUuid"
+      " characteristic=$characteristicUuid"
+      " service=$serviceUuid for device=$deviceId/$name";
 }
