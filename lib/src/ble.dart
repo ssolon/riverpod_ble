@@ -286,8 +286,6 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
           " service=$serviceUuid"
           " characteristic=$characteristicUuid = $e");
     }
-
-    return Future.value([]); // Should never happen but makes lint happy
   }
 
   @override

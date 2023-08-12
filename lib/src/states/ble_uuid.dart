@@ -13,11 +13,26 @@ class BleUUID {
       r'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$',
       caseSensitive: false);
 
+  static final validHexStringRegex =
+      RegExp(r'^[0-9a-f]+$', caseSensitive: false);
+
+  const BleUUID._(this.str);
+
   /// Create from a [uuidString] which must be in standard UUID format
-  BleUUID(String uuidString) : str = uuidString.toLowerCase() {
-    if (!validateUUID(str)) {
+  /// or a hex string for a short uuid.
+  factory BleUUID(String uuidString) {
+    final str = uuidString.toLowerCase();
+
+    if (validateUUID(str)) {
+      return BleUUID._(str);
+    }
+
+    // Check for hex string
+    if (!validateHexString(str)) {
       throw FormatException("Malformed BleUUID String", str);
     }
+
+    return BleUUID.fromInt(int.parse(str, radix: 16));
   }
 
   /// Create from integer [shortUUID]
@@ -47,8 +62,13 @@ class BleUUID {
         _ => str,
       };
 
-  /// Check [uuidstring] has a valid format
+  /// Check [uuidstring] has a valid standard string format
   static bool validateUUID(String uuidString) {
     return validateRegex.hasMatch(uuidString);
+  }
+
+  /// Check [uuidstring] is a valid hex number as string
+  static bool validateHexString(String s) {
+    return validHexStringRegex.hasMatch(s);
   }
 }
