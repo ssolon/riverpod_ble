@@ -62,6 +62,15 @@ class BleUUID {
         _ => str,
       };
 
+  // factory BleUUID.fromJson(Map<String, dynamic> json) =>
+  //     _$BleUUIDFromJson(json);
+
+  BleUUID.fromJson(Map<String, dynamic> json) : str = json['str'];
+//
+  Map<String, dynamic> toJson() => {
+        'str': str,
+      };
+
   /// Check [uuidstring] has a valid standard string format
   static bool validateUUID(String uuidString) {
     return validateRegex.hasMatch(uuidString);

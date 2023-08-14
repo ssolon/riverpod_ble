@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod_ble/src/states/ble_uuid.dart';
 
@@ -138,6 +140,44 @@ void main() {
 
     test("Short UUID as hex constant", () {
       expect(BleUUID.fromInt(0x1826).toString(), '0x1826');
+    });
+  });
+
+  group('Json conversion', () {
+    test('Custom uuid', () {
+      const u = '807309dd-7ccf-418e-bfdc-b7fda39e75c5';
+      final o = BleUUID(u);
+      final j = jsonEncode(o);
+
+      final c = BleUUID.fromJson(jsonDecode(j));
+
+      expect(c.str, u, reason: 'Converted uuid should be equal');
+      expect(c.str, o.str, reason: "Uuids should be equal");
+      expect(c, o, reason: 'BleUUIDs should be equal');
+    });
+
+    test('Short int uuid', () {
+      const u = '00001826-0000-1000-8000-00805f9b34fb';
+      final o = BleUUID.fromInt(0x1826);
+      final j = jsonEncode(o);
+      final c = BleUUID.fromJson(jsonDecode(j));
+
+      expect(c.str, o.str, reason: 'Full uuid should match');
+      expect(c.isShort, true, reason: 'Should be short');
+      expect(c, o, reason: 'BleUUID objects should be equal');
+      expect(c.shortUUID, 0x1826, reason: 'Short should be equal');
+    });
+
+    test('Short text uuid', () {
+      const u = '00001826-0000-1000-8000-00805f9b34fb';
+      final o = BleUUID('1826');
+      final j = jsonEncode(o);
+      final c = BleUUID.fromJson(jsonDecode(j));
+
+      expect(c.str, o.str, reason: 'Full uuid should match');
+      expect(c.isShort, true, reason: 'Should be short');
+      expect(c, o, reason: 'BleUUID objects should be equal');
+      expect(c.shortUUID, 0x1826, reason: 'Short should be equal');
     });
   });
 }
