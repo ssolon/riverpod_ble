@@ -72,7 +72,7 @@ abstract class _Ble<T, S, C, D> {
   /// Disconnect from device
   Future<void> disconnectFrom(String deviceId, String name);
 
-  BleService bleServiceFor(S nativeService);
+  BleService bleServiceFor(S nativeService, String? deviceName);
   BleUUID serviceUuidFrom(S nativeService);
 
   Future<S> serviceFor(
@@ -91,7 +91,8 @@ abstract class _Ble<T, S, C, D> {
 
   List<C> characteristicsFrom(S nativeService);
   BleUUID characteristicUuidFrom(C nativeCharacteristic);
-  BleCharacteristic bleCharacteristicFor(C nativeCharacteristic);
+  BleCharacteristic bleCharacteristicFor(
+      C nativeCharacteristic, String? deviceName);
 
   Future<C> characteristicFor(BleUUID characteristicUuid, BleUUID serviceUuid,
       String deviceId, String? name) async {
@@ -198,7 +199,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
     try {
       final services = await native.discoverServices();
       final result = <BleService>[
-        for (final s in services) bleServiceFor(s),
+        for (final s in services) bleServiceFor(s, name),
       ];
 
       return Future.value(result);
@@ -208,11 +209,13 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleCharacteristic bleCharacteristicFor(BluetoothCharacteristic c) {
+  BleCharacteristic bleCharacteristicFor(
+      BluetoothCharacteristic c, String? deviceName) {
     final deviceId = c.remoteId.str;
 
     return BleCharacteristic(
       deviceId: deviceId,
+      deviceName: deviceName,
       serviceUuid: BleUUID(c.serviceUuid.toString()),
       characteristicUuid: BleUUID(c.characteristicUuid.toString()),
       properties: BleCharacteristicProperties(
@@ -245,12 +248,13 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleService bleServiceFor(BluetoothService s) {
+  BleService bleServiceFor(BluetoothService s, String? deviceName) {
     final deviceId = s.remoteId.str;
     return BleService(
       deviceId,
+      deviceName,
       BleUUID(s.serviceUuid.toString()),
-      [for (final c in s.characteristics) bleCharacteristicFor(c)],
+      [for (final c in s.characteristics) bleCharacteristicFor(c, deviceName)],
     );
   }
 
