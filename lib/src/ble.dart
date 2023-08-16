@@ -447,15 +447,33 @@ class BleScannerStatus extends _$BleScannerStatus {
 class BleConnection extends _$BleConnection {
   @override
   Future<BleDevice> build(String deviceId, String name) async {
+    _logger.fine('BleConnection: build');
     ref.onDispose(() {
       _logger.fine("BleConnection: dispose");
       _ble.disconnectFrom(deviceId, name);
     });
 
+    //!!!! Debugging
+    ref.onAddListener(() {
+      _logger.fine('BleConnection: addListener');
+    });
+    ref.onRemoveListener(() {
+      _logger.fine('BleConnection: removeListener');
+    });
+    ref.onCancel(() {
+      _logger.fine('BleConnection: cancel');
+    });
+    ref.onResume(() {
+      _logger.fine('BleConnection: resume');
+    });
+    //!!!! Debugging
+
     state = const AsyncValue<BleDevice>.loading();
 
     try {
-      return await _ble.connectTo(deviceId);
+      final device = await _ble.connectTo(deviceId);
+      _logger.finest('BleConnection: connected');
+      return device;
     } catch (e) {
       return Future.error("Error connecting to $deviceId/$name = $e");
     }
@@ -485,48 +503,106 @@ class BleServicesFor extends _$BleServicesFor {
     String deviceId,
     String? name,
   ) async {
-    final connection = ref.watch(bleConnectionProvider(deviceId, name ?? ''));
-    connection.when(
-      loading: () {
-        state = const AsyncLoading();
+    _logger.finest('bleServicesFor: start');
+    ref.listen(bleConnectionProvider(deviceId, name ?? ''), (previous, next) {
+      next.when(
+        loading: () {
+          _logger.finest('bleServicesFor: loading');
+          // state = const AsyncLoading();
+        },
+        data: (data) async {
+          _logger.finest('bleServicesFor: got connection');
+
+          // Connected, discover services
+          try {
+            final result = await _ble.servicesFor(deviceId, name ?? '');
+            _logger.finest('bleServciesFor: got services');
+            _completer.complete(result);
+          } catch (e) {
+            _logger.finest("bleServicesFor: error=$e");
+            _completer.completeError(e);
+          }
+        },
+        // Error on connection
+        error: (error, stackTrace) =>
+            _completer.completeError(error, stackTrace),
+      );
+    });
+
+    ref.onAddListener(
+      () {
+        _logger.finest('bleServicesFor: onAddListener');
       },
-      data: (data) async {
-        // Connected, discover services
-        try {
-          final result = await _ble.servicesFor(deviceId, name ?? '');
-          _completer.complete(result);
-        } catch (e) {
-          _completer.completeError(e);
-        }
+    );
+    ref.onRemoveListener(
+      () {
+        _logger.finest('bleServicesFor: onRemoveListener');
       },
-      // Error on connection
-      error: (error, stackTrace) => _completer.completeError(error, stackTrace),
+    );
+    ref.onCancel(
+      () {
+        _logger.finest('bleServicesFor: onCancel');
+      },
+    );
+    ref.onDispose(
+      () {
+        _logger.finest('bleServicesFor: onDispose');
+      },
     );
 
+    _logger.finest("bleServicesFor: done=${_completer.isCompleted}");
     return _completer.future;
   }
 }
 
 /// Return the value of a descriptor
 @riverpod
-Future<List<int>> bleDescriptorValue(
-  BleDescriptorValueRef ref,
-  String deviceId,
-  String? name,
-  BleUUID serviceUuid,
-  BleUUID characteristicUuid,
-  BleUUID descriptorUuid,
-) async {
-  try {
-    _logger.fine("bleDescriptorValue: start");
-    return Future.value(await _ble.readDescriptor(
-        deviceId: deviceId,
-        name: name ?? '',
-        serviceUuid: serviceUuid,
-        characteristicUuid: characteristicUuid,
-        descriptorUuid: descriptorUuid));
-  } catch (e) {
-    return Future.error(e);
+class BleDescriptorValue extends _$BleDescriptorValue {
+  @override
+  Future<List<int>> build(
+    String deviceId,
+    String? name,
+    BleUUID serviceUuid,
+    BleUUID characteristicUuid,
+    BleUUID descriptorUuid,
+  ) async {
+    final completer = Completer<List<int>>();
+
+    try {
+      _logger.fine("bleDescriptorValue: start");
+
+      ref.listen(
+        bleServicesForProvider(deviceId, name),
+        (previous, next) {
+          next.when(
+            data: (services) async {
+              _logger.finest('bleDescriptorValue: got services?');
+              final s = services.where((e) => e.serviceUuid == serviceUuid);
+
+              if (s.isEmpty) {
+                throw UnknownService(serviceUuid, deviceId, name,
+                    "Reading descriptor $descriptorUuid");
+              }
+              final value = Future.value(await _ble.readDescriptor(
+                  deviceId: deviceId,
+                  name: name ?? '',
+                  serviceUuid: serviceUuid,
+                  characteristicUuid: characteristicUuid,
+                  descriptorUuid: descriptorUuid));
+              completer.complete(value);
+            },
+            error: (error, stackTrace) => throw error,
+            loading: () {
+              // ignore
+            },
+          );
+        },
+      );
+    } catch (e) {
+      return Future.error(e);
+    }
+
+    return completer.future;
   }
 }
 
@@ -544,12 +620,14 @@ class UnknownService extends RiverpodBleException {
   final BleUUID serviceUuid;
   final String deviceId;
   final String? name;
+  final String? reason;
 
-  const UnknownService(this.serviceUuid, this.deviceId, this.name);
+  const UnknownService(this.serviceUuid, this.deviceId, this.name,
+      [this.reason]);
 
   @override
   String toString() =>
-      "Unknown service=$serviceUuid for device=$deviceId/$name";
+      "Unknown service=$serviceUuid for device=$deviceId/$name $reason";
 }
 
 @immutable

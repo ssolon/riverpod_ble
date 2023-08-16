@@ -11,7 +11,7 @@ import 'package:yaml/yaml.dart';
 
 part 'uuid_providers.g.dart';
 
-final logger = SimpleLogger();
+final _logger = SimpleLogger();
 
 @immutable
 class UuidDef {
@@ -29,11 +29,11 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
   @override
   Future<void> build(String yamlFilePath) async {
     ref.onDispose(() {
-      logger.fine("UuidDefinitionsFromYaml: dispose");
+      _logger.fine("UuidDefinitionsFromYaml: dispose");
     });
 
     try {
-      logger.fine("UuidDefinitionFromYaml: build");
+      _logger.fine("UuidDefinitionFromYaml: build");
       final yamlString = await rootBundle.loadString(yamlFilePath);
       final yamlMap = loadYaml(yamlString) as Map;
 
@@ -66,11 +66,11 @@ Future<String> nameFor(NameForRef ref, BleUUID bleUUID, String yamlPath) async {
 
   if (bleUUID.isShort) {
     // Try to lookup
-    logger.fine("nameForService: short lookup uuid=$bleUUID");
+    _logger.fine("nameForService: short lookup uuid=$bleUUID");
     ref.listen(
       uuidDefinitionsFromYamlProvider(yamlPath),
       (previous, next) {
-        logger.fine("nameForService: previous=$previous next=$next");
+        _logger.fine("nameForService: previous=$previous next=$next");
         next.map(
           data: (value) {
             final def = ref
@@ -119,14 +119,55 @@ Future<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
 @riverpod
 Future<String> nameForCharacteristic(
     NameForCharacteristicRef ref, BleCharacteristic characteristic) async {
-  const servicesPath =
-      'packages/riverpod_ble/files/yaml/characteristic_uuids.yaml';
+  const servicesPath = 'packages/riverpod_ble/files/yaml/descriptors.yaml';
   final completer = Completer<String>();
+  final uuid = characteristic.characteristicUuid;
 
   ref.listen(
-    nameForProvider(characteristic.characteristicUuid, servicesPath),
+    nameForProvider(uuid, servicesPath),
     (prev, next) => next.when(
-      data: (data) => completer.complete(data),
+      data: (data) async {
+        var n = data;
+        // If no name, try for a descriptor name
+        if (data == uuid.str) {
+          final ds = characteristic.descriptors.where(isUserDescriptor);
+          if (ds.isNotEmpty) {
+            final d = ds.first;
+            try {
+              final subscription = ref.listen(
+                bleDescriptorValueProvider(
+                  d.deviceId,
+                  null,
+                  d.serviceUuid,
+                  d.characteristicUuid,
+                  d.descriptorUuid,
+                ),
+                (previous, next) {
+                  next.when(
+                    data: (values) {
+                      n = String.fromCharCodes(values);
+                      completer.complete(n);
+                    },
+                    error: (error, stackTrace) => throw error,
+                    loading: () {},
+                  );
+                },
+              );
+            } catch (e) {
+              completer.completeError(
+                "Exception getting user description for"
+                " deviceId=${d.deviceId}"
+                " service=${d.serviceUuid}"
+                " characteristic=${d.characteristicUuid}"
+                " descriptor=${d.descriptorUuid}"
+                ": $e",
+              );
+            }
+          }
+        } else {
+          completer.complete(n);
+        }
+      },
       error: (error, stack) => completer.completeError(error, stack),
       loading: () => completer.future,
     ),
@@ -135,6 +176,8 @@ Future<String> nameForCharacteristic(
 
   return completer.future;
 }
+
+bool isUserDescriptor(BleDescriptor d) => d.descriptorUuid.shortUUID == 0x2901;
 
 @riverpod
 Future<String> nameForDescriptor(NameForDescriptorRef ref, BleUUID uuid) async {
