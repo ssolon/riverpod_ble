@@ -63,6 +63,9 @@ abstract class _Ble<T, S, C, D> {
         status: await connectionStatusOf(native),
       );
 
+  /// Connected devices
+  Future<List<BleDevice>> connectedDevices();
+
   /// Connect to a device [deviceId]
   Future<void> connectTo(String deviceId);
 
@@ -159,12 +162,10 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   FutureOr<BleConnectionStatus> connectionStatusOf(
           BluetoothDevice native) async =>
       Future.value(switch (await native.connectionState.first) {
-        BluetoothConnectionState.connecting => BleConnectionStatus.connecting(),
         BluetoothConnectionState.connected => BleConnectionStatus.connected(),
-        BluetoothConnectionState.disconnecting =>
-          BleConnectionStatus.disconnecting(),
         BluetoothConnectionState.disconnected =>
           BleConnectionStatus.disconnected(),
+        _ => throw "Unknown native connect state",
       });
 
   @override
@@ -174,6 +175,16 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
         BmBluetoothDevice(
             localName: name, remoteId: deviceId, type: BmBluetoothSpecEnum.le),
       );
+
+  @override
+  Future<List<BleDevice>> connectedDevices() async {
+    final devices = await FlutterBluePlus.connectedSystemDevices;
+    final result = <BleDevice>[];
+    for (final d in devices) {
+      result.add(await bleDeviceFor(d));
+    }
+    return result;
+  }
 
   @override
   Future<BleDevice> connectTo(String id, {String? name}) async {
@@ -439,6 +450,15 @@ class BleScannerStatus extends _$BleScannerStatus {
       );
     });
     return false;
+  }
+}
+
+/// Returns the connected devices from the native implemention
+@riverpod
+class BleConnectedDevices extends _$BleConnectedDevices {
+  @override
+  FutureOr<List<BleDevice>> build() async {
+    return await _ble.connectedDevices();
   }
 }
 
