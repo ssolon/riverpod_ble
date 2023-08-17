@@ -547,7 +547,7 @@ class BleServicesFor extends _$BleServicesFor {
         error: (error, stackTrace) =>
             _completer.completeError(error, stackTrace),
       );
-    });
+    }, fireImmediately: true);
 
     ref.onAddListener(
       () {
@@ -617,6 +617,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
             },
           );
         },
+        fireImmediately: true,
       );
     } catch (e) {
       return Future.error(e);
