@@ -137,7 +137,7 @@ Future<String> nameForCharacteristic(
               final subscription = ref.listen(
                 bleDescriptorValueProvider(
                   d.deviceId,
-                  null,
+                  characteristic.deviceName,
                   d.serviceUuid,
                   d.characteristicUuid,
                   d.descriptorUuid,

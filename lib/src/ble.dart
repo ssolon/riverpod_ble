@@ -115,7 +115,7 @@ abstract class _Ble<T, S, C, D> {
 
   List<D> descriptorsFrom(C nativeCharacteristic);
   BleUUID descriptorUuidFrom(D nativeDescriptor);
-  BleDescriptor bleDescriptorFor(D nativeDescriptor);
+  BleDescriptor bleDescriptorFor(D nativeDescriptor, String? deviceName);
 
   Future<D> descriptorFor(BleUUID descriptorUuid, BleUUID characteristicUuid,
       BleUUID serviceUuid, String deviceId, String? name) async {
@@ -242,16 +242,17 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
         indicateEncryptionRequired: c.properties.indicateEncryptionRequired,
       ),
       descriptors: [
-        for (final d in c.descriptors) bleDescriptorFor(d),
+        for (final d in c.descriptors) bleDescriptorFor(d, deviceName),
       ],
     );
   }
 
   @override
-  BleDescriptor bleDescriptorFor(BluetoothDescriptor d) {
+  BleDescriptor bleDescriptorFor(BluetoothDescriptor d, String? deviceName) {
     final deviceId = d.remoteId.str;
     return BleDescriptor(
       deviceId: deviceId,
+      deviceName: deviceName,
       serviceUuid: BleUUID(d.serviceUuid.toString()),
       characteristicUuid: BleUUID(d.characteristicUuid.toString()),
       descriptorUuid: BleUUID(d.descriptorUuid.toString()),

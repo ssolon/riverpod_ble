@@ -42,6 +42,7 @@ class BleCharacteristicProperties with _$BleCharacteristicProperties {
 class BleDescriptor with _$BleDescriptor {
   factory BleDescriptor({
     required String deviceId,
+    String? deviceName,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
     required BleUUID descriptorUuid,
