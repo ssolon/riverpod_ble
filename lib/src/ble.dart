@@ -271,8 +271,15 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   /// Getting errors with multiple descriptor reads from different services
-  /// so use a Mutex to restrict access to a single call at a time
+  /// so use a Mutex to restrict access to a single call at a time.
+  /// Also seems to be a problem when mixing characteristic and descriptor
+  /// reads.
+  ///
   /// TODO Find out if this is a bug or a "feature" of the underlying library
+  /// Some indications online are that only single operations are
+  /// possible so this might not be enough.
+  /// Maybe this should be per device like the insufficient mutex already
+  /// in the flutter_blue_plus underlying library.
   final readDescriptorMutex = Mutex();
 
   /// Get the values for a descriptor
@@ -285,20 +292,41 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }) async {
     // Only allow a single
 
-    _logger.fine('_ble: readDescriptor start');
+    _logger.fine('_ble: readDescriptor start $descriptorUuid');
     final descriptor = await descriptorFor(
         descriptorUuid, characteristicUuid, serviceUuid, deviceId, name);
 
     try {
       return await readDescriptorMutex.protect(() async {
-        _logger.fine('_ble: readDescriptor read start');
+        _logger.fine('_ble: readDescriptor read start $descriptorUuid');
         final values = await descriptor.read();
-        _logger.fine('_ble: readDescriptor done');
+        _logger.fine('_ble: readDescriptor done $descriptorUuid');
         return Future.value(values);
       });
     } catch (e) {
       return Future.error("Exception reading descriptor $descriptorUuid"
           " for device=$deviceId/$name"
+          " service=$serviceUuid"
+          " characteristic=$characteristicUuid = $e");
+    }
+  }
+
+  Future<List<int>> readCharacteristic({
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+  }) async {
+    try {
+      final characteristic = await characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+      return await readDescriptorMutex.protect(() async {
+        final values = await characteristic.read();
+        return Future.value(values);
+      });
+    } catch (e) {
+      return Future.error("Exception reading characteristic"
+          " for device=$deviceId/$deviceName"
           " service=$serviceUuid"
           " characteristic=$characteristicUuid = $e");
     }
@@ -537,7 +565,7 @@ class BleServicesFor extends _$BleServicesFor {
           // Connected, discover services
           try {
             final result = await _ble.servicesFor(deviceId, name ?? '');
-            _logger.finest('bleServciesFor: got services');
+            _logger.finest('bleServicesFor: got services');
             _completer.complete(result);
           } catch (e) {
             _logger.finest("bleServicesFor: error=$e");
@@ -576,6 +604,55 @@ class BleServicesFor extends _$BleServicesFor {
   }
 }
 
+/// Return the value of a characteristic
+@riverpod
+class BleCharacteristicValue extends _$BleCharacteristicValue {
+  @override
+  Future<List<int>> build({
+    required String deviceId,
+    String? deviceName,
+    required BleUUID serviceUuid,
+    required characteristicUuid,
+  }) async {
+    final completer = Completer<List<int>>();
+
+    try {
+      ref.listen(
+        bleServicesForProvider(deviceId, deviceName),
+        (previous, next) {
+          next.when(
+            data: (services) async {
+              _logger.finest('bleCharacteristicValue: got services?');
+              final s = services.where((e) => e.serviceUuid == serviceUuid);
+
+              if (s.isEmpty) {
+                throw UnknownService(serviceUuid, deviceId, deviceName,
+                    "Reading characteristic $characteristicUuid");
+              }
+              final value = Future.value(await _ble.readCharacteristic(
+                deviceId: deviceId,
+                deviceName: deviceName ?? '',
+                serviceUuid: serviceUuid,
+                characteristicUuid: characteristicUuid,
+              ));
+              completer.complete(value);
+            },
+            error: (error, stackTrace) => throw error,
+            loading: () {
+              // ignore
+            },
+          );
+        },
+        fireImmediately: true,
+      );
+    } catch (e) {
+      // TODO More specific error message
+      state = AsyncError(e, StackTrace.current);
+    }
+    return completer.future;
+  }
+}
+
 /// Return the value of a descriptor
 @riverpod
 class BleDescriptorValue extends _$BleDescriptorValue {
@@ -590,27 +667,39 @@ class BleDescriptorValue extends _$BleDescriptorValue {
     final completer = Completer<List<int>>();
 
     try {
-      _logger.fine("bleDescriptorValue: start");
+      _logger.fine("bleDescriptorValue: start $descriptorUuid");
 
       ref.listen(
         bleServicesForProvider(deviceId, name),
         (previous, next) {
           next.when(
             data: (services) async {
-              _logger.finest('bleDescriptorValue: got services?');
-              final s = services.where((e) => e.serviceUuid == serviceUuid);
+              try {
+                _logger
+                    .finest('bleDescriptorValue: got services $descriptorUuid');
+                final s = services.where((e) => e.serviceUuid == serviceUuid);
 
-              if (s.isEmpty) {
-                throw UnknownService(serviceUuid, deviceId, name,
-                    "Reading descriptor $descriptorUuid");
+                if (s.isEmpty) {
+                  throw UnknownService(serviceUuid, deviceId, name,
+                      "Reading descriptor $descriptorUuid");
+                }
+                final value = await _ble.readDescriptor(
+                    deviceId: deviceId,
+                    name: name ?? '',
+                    serviceUuid: serviceUuid,
+                    characteristicUuid: characteristicUuid,
+                    descriptorUuid: descriptorUuid);
+                completer.complete(value);
+              } catch (e, t) {
+                state = AsyncError(
+                    "Exception reading value of "
+                    " descriptor=$descriptorUuid"
+                    " for device=$deviceId/$name"
+                    " service=$serviceUuid"
+                    " characteristic=$characteristicUuid"
+                    ":=$e",
+                    t);
               }
-              final value = Future.value(await _ble.readDescriptor(
-                  deviceId: deviceId,
-                  name: name ?? '',
-                  serviceUuid: serviceUuid,
-                  characteristicUuid: characteristicUuid,
-                  descriptorUuid: descriptorUuid));
-              completer.complete(value);
             },
             error: (error, stackTrace) => throw error,
             loading: () {
@@ -621,7 +710,8 @@ class BleDescriptorValue extends _$BleDescriptorValue {
         fireImmediately: true,
       );
     } catch (e) {
-      return Future.error(e);
+      // TODO more specific error message
+      state = AsyncError(e, StackTrace.current);
     }
 
     return completer.future;
