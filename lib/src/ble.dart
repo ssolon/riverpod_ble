@@ -378,7 +378,7 @@ class BleScanner extends _$BleScanner {
       (event) {
         _logger.info("BleScanner: scanning=$event");
         _isScanning = event;
-        state = isScanning
+        state = _isScanning
             ? BleScanResults.scanStarted()
             : BleScanResults.scanDone();
       },
@@ -394,9 +394,6 @@ class BleScanner extends _$BleScanner {
 
     return BleScanResults.initial();
   }
-
-  /// Scanner status
-  bool get isScanning => _isScanning;
 
   /// (Re)start scanning
   void start() {
