@@ -99,7 +99,7 @@ Future<String> nameFor(NameForRef ref, BleUUID bleUUID, String yamlPath) async {
 }
 
 @riverpod
-Future<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
+FutureOr<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
   const servicesPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
   final completer = Completer<String>();
 
@@ -148,7 +148,15 @@ Future<String> nameForCharacteristic(
                       n = String.fromCharCodes(values);
                       completer.complete(n);
                     },
-                    error: (error, stackTrace) => throw error,
+                    error: (error, stackTrace) {
+                      completer.completeError(
+                          "Exception getting nameForCharacteristic for"
+                          " device=${characteristic.deviceId}/${characteristic.deviceName}"
+                          " service=${characteristic.serviceUuid}"
+                          " characteristic=${characteristic.characteristicUuid}"
+                          ": $error",
+                          stackTrace);
+                    },
                     loading: () {},
                   );
                 },
