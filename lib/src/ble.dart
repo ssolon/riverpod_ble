@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:mutex/mutex.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -107,7 +108,10 @@ abstract class _Ble<T, S, C, D> {
     );
     if (nativeCharacteristic.isEmpty) {
       throw UnknownCharacteristic(
-          characteristicUuid, serviceUuid, deviceId, name);
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          deviceName: name);
     }
 
     return Future.value(nativeCharacteristic.first);
@@ -329,6 +333,38 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
           " for device=$deviceId/$deviceName"
           " service=$serviceUuid"
           " characteristic=$characteristicUuid = $e");
+    }
+  }
+
+  Future<Stream<List<int>>> setNotifyCharacteristic({
+    required bool notify,
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+  }) async {
+    try {
+      final characteristic = await characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+      return await readDescriptorMutex.protect(() async {
+        final notification = await characteristic.setNotifyValue(notify);
+        if (notify && !notification) {
+          return Future.error(FailedToEnableNotification(
+            characteristicUuid: characteristicUuid,
+            serviceUuid: serviceUuid,
+            deviceId: deviceId,
+            deviceName: deviceName,
+          ));
+        }
+        return Future.value(characteristic.onValueReceived);
+      });
+    } catch (e) {
+      return Future.error(ReadingCharacteristicException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+      ));
     }
   }
 
@@ -601,6 +637,64 @@ class BleServicesFor extends _$BleServicesFor {
   }
 }
 
+/// Return a characteristic
+@riverpod
+class BleCharacteristicFor extends _$BleCharacteristicFor {
+  @override
+  Future<BleCharacteristic> build({
+    required BleUUID characteristicUuid,
+    required BleUUID serviceUuid,
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    final completer = Completer<BleCharacteristic>();
+
+    try {
+      ref.listen(bleServicesForProvider(deviceId, deviceName),
+          (previous, next) {
+        next.when(
+          data: (services) async {
+            final s = services.where((e) => e.serviceUuid == serviceUuid);
+
+            if (s.isEmpty) {
+              state = AsyncError(
+                UnknownService(serviceUuid, deviceId, deviceName),
+                StackTrace.current,
+              );
+            } else {
+              try {
+                final c = await _ble.characteristicFor(
+                  characteristicUuid,
+                  serviceUuid,
+                  deviceId,
+                  deviceName,
+                );
+                state = AsyncData(_ble.bleCharacteristicFor(c, deviceName));
+              } catch (e, t) {
+                state = AsyncError(_failed(e), t);
+              }
+            }
+          },
+          error: (error, stackTrace) {
+            state = AsyncError(_failed(error), stackTrace);
+          },
+          loading: () {},
+        );
+      });
+    } catch (e, t) {
+      state = AsyncError(_failed(e), t);
+    }
+    return completer.future;
+  }
+
+  _failed(e) => CharacteristicException(
+      reason: "Exception accessing characteristic=$e",
+      characteristicUuid: characteristicUuid,
+      serviceUuid: serviceUuid,
+      deviceId: deviceId,
+      deviceName: deviceName);
+}
+
 /// Return the value of a characteristic
 @riverpod
 class BleCharacteristicValue extends _$BleCharacteristicValue {
@@ -648,6 +742,85 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
     }
     return completer.future;
   }
+}
+
+/// Notification for a characteristic
+@riverpod
+class BleCharacteristicNotification extends _$BleCharacteristicNotification {
+  Stream<List<int>>? _notifications;
+
+  @override
+  Future<List<int>> build({
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+  }) async {
+    final completer = Completer<List<int>>();
+
+    ref.onDispose(
+      () async {
+        _logger.fine(
+            "bleCharacteristicNotificationProvider: dispose $characteristicUuid");
+        if (_notifications != null) {
+          await _ble.setNotifyCharacteristic(
+            notify: false,
+            characteristicUuid: characteristicUuid,
+            serviceUuid: serviceUuid,
+            deviceId: deviceId,
+            deviceName: deviceName,
+          );
+        }
+      },
+    );
+
+    try {
+      ref.listen(
+        bleCharacteristicForProvider(
+            characteristicUuid: characteristicUuid,
+            serviceUuid: serviceUuid,
+            deviceId: deviceId,
+            deviceName: deviceName),
+        (previous, next) {
+          next.when(
+            data: (c) async {
+              try {
+                _notifications = await _ble.setNotifyCharacteristic(
+                  notify: true,
+                  characteristicUuid: characteristicUuid,
+                  serviceUuid: serviceUuid,
+                  deviceId: deviceId,
+                  deviceName: deviceName,
+                );
+
+                final s = _notifications;
+                if (s != null) {
+                  await for (final v in s) {
+                    state = AsyncData(v);
+                  }
+                }
+              } catch (e, t) {
+                state = AsyncError(_failed(e), t);
+              }
+            },
+            error: (e, t) => state = AsyncError(_failed(e), t),
+            loading: () {},
+          );
+        },
+      );
+    } catch (e, t) {
+      state = AsyncError(_failed(e), t);
+    }
+    return completer.future;
+  }
+
+  _failed(e) => FailedToEnableNotification(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        reason: e,
+      );
 }
 
 /// Return the value of a descriptor
@@ -740,22 +913,71 @@ class UnknownService extends RiverpodBleException {
 }
 
 @immutable
-class UnknownCharacteristic extends RiverpodBleException {
+class CharacteristicException extends RiverpodBleException {
   final BleUUID characteristicUuid;
   final BleUUID serviceUuid;
   final String deviceId;
-  final String? name;
+  final String? deviceName;
+  final String? reason;
 
-  const UnknownCharacteristic(
-    this.characteristicUuid,
-    this.serviceUuid,
-    this.deviceId,
-    this.name,
-  );
+  const CharacteristicException({
+    required this.characteristicUuid,
+    required this.serviceUuid,
+    required this.deviceId,
+    required this.deviceName,
+    this.reason,
+  });
 
   @override
-  String toString() => "Unknown characteristic=$characteristicUuid"
-      " service=$serviceUuid for device=$deviceId/$name";
+  String toString() {
+    final r = reason != null ? " reason=$reason:" : '';
+    return "$r"
+        " characteristic=$characteristicUuid"
+        " serviceUuid=$serviceUuid"
+        " device=$deviceId/$deviceName";
+  }
+}
+
+@immutable
+class UnknownCharacteristic extends CharacteristicException {
+  const UnknownCharacteristic({
+    required super.characteristicUuid,
+    required super.serviceUuid,
+    required super.deviceId,
+    required super.deviceName,
+    super.reason,
+  });
+
+  @override
+  String toString() => "Unknown characteristic: ${super.toString()}";
+}
+
+@immutable
+class FailedToEnableNotification extends CharacteristicException {
+  const FailedToEnableNotification({
+    required super.characteristicUuid,
+    required super.serviceUuid,
+    required super.deviceId,
+    required super.deviceName,
+    super.reason,
+  });
+
+  @override
+  String toString() => "Failed to enable notification: ${super.toString()}";
+}
+
+@immutable
+class ReadingCharacteristicException extends CharacteristicException {
+  const ReadingCharacteristicException({
+    required super.characteristicUuid,
+    required super.serviceUuid,
+    required super.deviceId,
+    required super.deviceName,
+    super.reason,
+  });
+
+  @override
+  String toString() => "Failed to read characteristic: ${super.toString()}";
 }
 
 @immutable
