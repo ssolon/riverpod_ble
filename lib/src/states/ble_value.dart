@@ -8,6 +8,9 @@ part 'ble_value.freezed.dart';
 /// Convert [rawValue] to a [BleValue] using [f] if provided otherwise use
 /// the [PresentationValue] from [rawValue] and if that's not there use
 /// the default which will have [FormatType.unkonwn].
+///
+/// Note: numeric values are assumed to be little-endian which conforms
+/// to the GATT spec. Some devices don't follow this.
 BleValue convertRawValue(BleRawValue rawValue, BlePresentationFormat? f) {
   f ??= rawValue.format;
   f ??= BlePresentationFormat();
@@ -183,6 +186,8 @@ class BleRawValue with _$BleRawValue {
 }
 
 /// Converted (if possible) value.
+///
+/// [toString()] is overridden to return the [toString()] of the current value.
 @freezed
 class BleValue with _$BleValue {
   const BleValue._();
@@ -229,12 +234,12 @@ class BleValue with _$BleValue {
 
   @override
   String toString() => when(
-        (raw, format) => raw.toString(),
-        boolean: (r, f, v) => v.toString(),
-        utf: (r, f, v) => v.toString(),
-        numeric: (r, f, v) => v.toString(),
-        bigNumeric: (r, f, v) => v.toString(),
-        float: (r, f, v) => v.toString(),
-        unsupported: (raw, format) => raw.toString(),
-      );
+        (raw, format) => raw,
+        boolean: (r, f, v) => v,
+        utf: (r, f, v) => v,
+        numeric: (r, f, v) => v,
+        bigNumeric: (r, f, v) => v,
+        float: (r, f, v) => v,
+        unsupported: (raw, format) => raw,
+      ).toString();
 }
