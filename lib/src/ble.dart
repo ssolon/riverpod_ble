@@ -699,13 +699,13 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
 @riverpod
 class BleCharacteristicValue extends _$BleCharacteristicValue {
   @override
-  Future<List<int>> build({
+  Future<BleRawValue> build({
     required String deviceId,
     String? deviceName,
     required BleUUID serviceUuid,
     required characteristicUuid,
   }) async {
-    final completer = Completer<List<int>>();
+    final completer = Completer<BleRawValue>();
 
     try {
       ref.listen(
@@ -720,13 +720,13 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
                 throw UnknownService(serviceUuid, deviceId, deviceName,
                     "Reading characteristic $characteristicUuid");
               }
-              final value = Future.value(await _ble.readCharacteristic(
+              final value = await _ble.readCharacteristic(
                 deviceId: deviceId,
                 deviceName: deviceName ?? '',
                 serviceUuid: serviceUuid,
                 characteristicUuid: characteristicUuid,
-              ));
-              completer.complete(value);
+              );
+              completer.complete(BleRawValue(values: value));
             },
             error: (error, stackTrace) => throw error,
             loading: () {
@@ -750,13 +750,13 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
   Stream<List<int>>? _notifications;
 
   @override
-  Future<List<int>> build({
+  Future<BleRawValue> build({
     required String deviceId,
     required String deviceName,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
   }) async {
-    final completer = Completer<List<int>>();
+    final completer = Completer<BleRawValue>();
 
     ref.onDispose(
       () async {
@@ -796,7 +796,7 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
                 final s = _notifications;
                 if (s != null) {
                   await for (final v in s) {
-                    state = AsyncData(v);
+                    state = AsyncData(BleRawValue(values: v));
                   }
                 }
               } catch (e, t) {
@@ -819,8 +819,18 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
         serviceUuid: serviceUuid,
         deviceId: deviceId,
         deviceName: deviceName,
-        reason: e,
+        reason: e.toString(),
       );
+}
+
+/// Convert raw value if possible.
+///
+/// If [f] is provided be used for the conversion otherwise the
+/// [PresentationFormat] in [raw] will be used and if that is not present
+/// the returned value will be a [BleValue.unsupported].
+BleValue convertBleRawValue(BleRawValue raw, [BlePresentationFormat? f]) {
+  return BleValue.unsupported(
+      raw.values, raw.format?.gattFormat ?? FormatTypes.unknown);
 }
 
 /// Return the value of a descriptor
