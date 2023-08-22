@@ -576,8 +576,49 @@ class BleConnection extends _$BleConnection {
       _logger.finest('BleConnection: connected');
       return device;
     } catch (e) {
-      return Future.error("Error connecting to $deviceId/$name = $e");
+      return Future.error(BleConnectionException(deviceId, name, e.toString()));
     }
+  }
+
+  disconnect() {
+    _logger.fine("BleConnection: disconnect from $name/$deviceId");
+    _ble.disconnectFrom(deviceId, name);
+  }
+}
+
+/// Monitor changes in the connection status of [deviceId]
+///
+/// Recommended usage is to use watch [bleConnectionMonitor] which will create
+/// a connection and monitor it to control access to the device.
+@riverpod
+class BleConnectionMonitor extends _$BleConnectionMonitor {
+  @override
+  FutureOr<BleConnectionState> build(
+    String deviceId,
+    String deviceName,
+  ) async {
+    late Stream<BleConnectionState> states;
+
+    ref.listen(bleConnectionProvider(deviceId, deviceName), (previous, next) {
+      next.when(
+        data: (data) async {
+          // Connected -- listen to status stream for changes
+          states = _ble.connectionStreamFor(deviceId, deviceName);
+          await for (final s in states) {
+            _logger.fine("BleConnectionMonitor: stream $s");
+            state = AsyncData(s);
+          }
+        },
+        loading: () => state = const AsyncLoading(),
+        error: (error, stackTrace) {
+          state = AsyncError(
+              BleConnectionException(deviceId, deviceName, error.toString()),
+              stackTrace);
+        },
+      );
+    }, fireImmediately: true);
+
+    return BleConnectionState.initial();
   }
 }
 
@@ -921,6 +962,15 @@ class BleDescriptorValue extends _$BleDescriptorValue {
 /// Marker class for one our exceptions
 abstract class RiverpodBleException implements Exception {
   const RiverpodBleException();
+}
+
+@immutable
+class BleConnectionException extends RiverpodBleException {
+  final String deviceId;
+  final String deviceName;
+  final String reason;
+
+  const BleConnectionException(this.deviceId, this.deviceName, this.reason);
 }
 
 @immutable
