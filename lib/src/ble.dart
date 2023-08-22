@@ -899,10 +899,8 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                     t);
               }
             },
-            error: (error, stackTrace) => throw error,
-            loading: () {
-              // ignore
-            },
+            error: (error, stackTrace) => state = AsyncError(error, stackTrace),
+            loading: () => const AsyncLoading(),
           );
         },
         fireImmediately: true,
