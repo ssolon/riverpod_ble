@@ -627,7 +627,7 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
       );
     }, fireImmediately: true);
 
-    return BleConnectionState.initial();
+    return BleConnectionState.unknownState();
   }
 }
 

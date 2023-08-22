@@ -4,9 +4,9 @@ part 'ble_connection_state.freezed.dart';
 
 @freezed
 class BleConnectionState with _$BleConnectionState {
-  factory BleConnectionState.initial() = Initial;
+  factory BleConnectionState.unknownState() = UnknownState;
   factory BleConnectionState.error(Object error, StackTrace? stackTrace) =
-      Error;
+      ConnectionStateError;
   factory BleConnectionState.connected() = Connected;
   factory BleConnectionState.disconnected() = Disconnected;
 }
