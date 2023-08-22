@@ -21,7 +21,7 @@ class BleDevice<T> with _$BleDevice {
     String? name,
     required T nativeDevice,
     @Default([]) List<BleUUID> services,
-    required BleConnectionStatus status,
+    required BleConnectionState status,
   }) = _BleDevice;
 
   factory BleDevice.error({

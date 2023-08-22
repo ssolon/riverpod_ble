@@ -9,7 +9,7 @@ class BleConnectionEvent with _$BleConnectionEvent {
   factory BleConnectionEvent({
     required String deviceId,
     String? name,
-    required BleConnectionStatus status,
+    required BleConnectionState status,
   }) = _BleConnectionEvent;
 
   // factory BleConnectionEvent.fromJson(Map<String, dynamic> json) =>

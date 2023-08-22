@@ -43,7 +43,10 @@ abstract class _Ble<T, S, C, D> {
   String nameOf(T native);
 
   /// Get the connection status of a native device
-  FutureOr<BleConnectionStatus> connectionStatusOf(T native);
+  FutureOr<BleConnectionState> connectionStatusOf(T native);
+
+  /// Get a stream of connection state
+  Stream<BleConnectionState> connectionStreamFor(String deviceId, String name);
 
   /// Get the service (if present) from a native device
   Future<List<S>> servicesFrom(T native);
@@ -163,14 +166,26 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  FutureOr<BleConnectionStatus> connectionStatusOf(
+  FutureOr<BleConnectionState> connectionStatusOf(
           BluetoothDevice native) async =>
-      Future.value(switch (await native.connectionState.first) {
-        BluetoothConnectionState.connected => BleConnectionStatus.connected(),
+      Future.value(_connectionStateFrom(await native.connectionState.first));
+
+  BleConnectionState _connectionStateFrom(BluetoothConnectionState s) =>
+      switch (s) {
+        BluetoothConnectionState.connected => BleConnectionState.connected(),
         BluetoothConnectionState.disconnected =>
-          BleConnectionStatus.disconnected(),
+          BleConnectionState.disconnected(),
         _ => throw "Unknown native connect state",
-      });
+      };
+
+  @override
+  Stream<BleConnectionState> connectionStreamFor(String deviceId, String name) {
+    return deviceFor(deviceId, name).connectionState.transform(
+          StreamTransformer.fromHandlers(
+            handleData: (data, sink) => sink.add(_connectionStateFrom(data)),
+          ),
+        );
+  }
 
   @override
   BluetoothDevice nativeFrom(
