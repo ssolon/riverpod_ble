@@ -547,7 +547,7 @@ class BleConnection extends _$BleConnection {
     _logger.fine('BleConnection: build');
     ref.onDispose(() {
       _logger.fine("BleConnection: dispose");
-      _ble.disconnectFrom(deviceId, name);
+      disconnect();
     });
 
     //!!!! Debugging
@@ -567,6 +567,10 @@ class BleConnection extends _$BleConnection {
 
     state = const AsyncValue<BleDevice>.loading();
 
+    return await connect();
+  }
+
+  FutureOr<BleDevice> connect() async {
     try {
       final device = await _ble.connectTo(deviceId);
       _logger.finest('BleConnection: connected');
