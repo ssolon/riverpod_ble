@@ -597,16 +597,25 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
     String deviceId,
     String deviceName,
   ) async {
-    late Stream<BleConnectionState> states;
+    Stream<BleConnectionState>? states;
+
+    ref.onDispose(() => _logger.fine("BleConnectionMonitor.onDispose"));
+
+    _logger.fine("BleConnectionMonitor.build $deviceId/$deviceName");
 
     ref.listen(bleConnectionProvider(deviceId, deviceName), (previous, next) {
       next.when(
         data: (data) async {
-          // Connected -- listen to status stream for changes
-          states = _ble.connectionStreamFor(deviceId, deviceName);
-          await for (final s in states) {
-            _logger.fine("BleConnectionMonitor: stream $s");
-            state = AsyncData(s);
+          // Connected -- listen to status stream for changes if we haven't
+          // already set this up
+
+          if (states == null) {
+            states = _ble.connectionStreamFor(deviceId, deviceName);
+
+            await for (final s in states!) {
+              _logger.fine("BleConnectionMonitor: stream $s");
+              state = AsyncData(s);
+            }
           }
         },
         loading: () => state = const AsyncLoading(),
