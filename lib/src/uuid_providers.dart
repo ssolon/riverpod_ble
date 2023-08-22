@@ -117,72 +117,74 @@ FutureOr<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
 }
 
 @riverpod
-Future<String> nameForCharacteristic(
-    NameForCharacteristicRef ref, BleCharacteristic characteristic) async {
-  const servicesPath = 'packages/riverpod_ble/files/yaml/descriptors.yaml';
-  final completer = Completer<String>();
-  final uuid = characteristic.characteristicUuid;
+class NameForCharacteristic extends _$NameForCharacteristic {
+  @override
+  Future<String> build(BleCharacteristic characteristic) async {
+    const servicesPath = 'packages/riverpod_ble/files/yaml/descriptors.yaml';
+    final completer = Completer<String>();
+    final uuid = characteristic.characteristicUuid;
 
-  ref.listen(
-    nameForProvider(uuid, servicesPath),
-    (prev, next) => next.when(
-      data: (data) async {
-        var n = data;
-        // If no name, try for a descriptor name
-        if (data == uuid.str) {
-          final ds = characteristic.descriptors.where(isUserDescriptor);
-          if (ds.isNotEmpty) {
-            final d = ds.first;
-            try {
-              final subscription = ref.listen(
-                bleDescriptorValueProvider(
-                  d.deviceId,
-                  characteristic.deviceName,
-                  d.serviceUuid,
-                  d.characteristicUuid,
-                  d.descriptorUuid,
-                ),
-                (previous, next) {
-                  next.when(
-                    data: (values) {
-                      n = String.fromCharCodes(values);
-                      completer.complete(n);
-                    },
-                    error: (error, stackTrace) {
-                      completer.completeError(
-                          "Exception getting nameForCharacteristic for"
-                          " device=${characteristic.deviceId}/${characteristic.deviceName}"
-                          " service=${characteristic.serviceUuid}"
-                          " characteristic=${characteristic.characteristicUuid}"
-                          ": $error",
-                          stackTrace);
-                    },
-                    loading: () {},
-                  );
-                },
-              );
-            } catch (e) {
-              completer.completeError(
-                "Exception getting user description for"
-                " deviceId=${d.deviceId}"
-                " service=${d.serviceUuid}"
-                " characteristic=${d.characteristicUuid}"
-                " descriptor=${d.descriptorUuid}"
-                ": $e",
-              );
+    ref.listen(
+      nameForProvider(uuid, servicesPath),
+      (prev, next) => next.when(
+        data: (data) async {
+          var n = data;
+          // If no name, try for a descriptor name
+          if (data == uuid.str) {
+            final ds = characteristic.descriptors.where(isUserDescriptor);
+            if (ds.isNotEmpty) {
+              final d = ds.first;
+              try {
+                ref.listen(
+                  bleDescriptorValueProvider(
+                    d.deviceId,
+                    characteristic.deviceName,
+                    d.serviceUuid,
+                    d.characteristicUuid,
+                    d.descriptorUuid,
+                  ),
+                  (previous, next) {
+                    next.when(
+                      data: (values) {
+                        n = String.fromCharCodes(values);
+                        state = AsyncData(n);
+                      },
+                      error: (error, stackTrace) {
+                        state = AsyncError(
+                            "Exception getting nameForCharacteristic for"
+                            " device=${characteristic.deviceId}/${characteristic.deviceName}"
+                            " service=${characteristic.serviceUuid}"
+                            " characteristic=${characteristic.characteristicUuid}"
+                            ": $error",
+                            stackTrace);
+                      },
+                      loading: () => state = const AsyncLoading(),
+                    );
+                  },
+                );
+              } catch (e, t) {
+                state = AsyncError(
+                    "Exception getting user description for"
+                    " deviceId=${d.deviceId}"
+                    " service=${d.serviceUuid}"
+                    " characteristic=${d.characteristicUuid}"
+                    " descriptor=${d.descriptorUuid}"
+                    ": $e",
+                    t);
+              }
             }
+          } else {
+            state = AsyncData(n);
           }
-        } else {
-          completer.complete(n);
-        }
-      },
-      error: (error, stack) => completer.completeError(error, stack),
-      loading: () => completer.future,
-    ),
-    fireImmediately: true,
-  );
+        },
+        error: (error, stack) => state = AsyncError(error, stack),
+        loading: () => state = const AsyncLoading(),
+      ),
+      fireImmediately: true,
+    );
 
-  return completer.future;
+    return completer.future;
+  }
 }
 
 bool isUserDescriptor(BleDescriptor d) => d.descriptorUuid.shortUUID == 0x2901;

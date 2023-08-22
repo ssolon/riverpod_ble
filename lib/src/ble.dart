@@ -618,15 +618,14 @@ class BleServicesFor extends _$BleServicesFor {
           try {
             final result = await _ble.servicesFor(deviceId, name ?? '');
             _logger.finest('bleServicesFor: got services');
-            _completer.complete(result);
-          } catch (e) {
+            state = AsyncData(result);
+          } catch (e, stack) {
             _logger.finest("bleServicesFor: error=$e");
-            _completer.completeError(e);
+            state = AsyncError(e, stack);
           }
         },
         // Error on connection
-        error: (error, stackTrace) =>
-            _completer.completeError(error, stackTrace),
+        error: (error, stackTrace) => state = AsyncError(error, stackTrace),
       );
     }, fireImmediately: true);
 
@@ -888,7 +887,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                     serviceUuid: serviceUuid,
                     characteristicUuid: characteristicUuid,
                     descriptorUuid: descriptorUuid);
-                completer.complete(value);
+                state = AsyncData(value);
               } catch (e, t) {
                 state = AsyncError(
                     "Exception reading value of "
