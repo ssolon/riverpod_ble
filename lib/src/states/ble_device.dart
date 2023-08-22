@@ -1,7 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'ble_uuid.dart';
-import 'ble_connection_status.dart';
+import 'ble_connection_state.dart';
 
 part 'ble_device.freezed.dart';
 

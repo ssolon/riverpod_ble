@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-part 'ble_connection_status.freezed.dart';
+part 'ble_connection_state.freezed.dart';
 
 @freezed
 class BleConnectionState with _$BleConnectionState {
