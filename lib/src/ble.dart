@@ -980,6 +980,9 @@ class BleConnectionException extends RiverpodBleException {
   final String reason;
 
   const BleConnectionException(this.deviceId, this.deviceName, this.reason);
+
+  @override
+  String toString() => "Failed to connect to $deviceName ($deviceId): $reason";
 }
 
 @immutable
