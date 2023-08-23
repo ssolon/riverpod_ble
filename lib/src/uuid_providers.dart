@@ -120,7 +120,8 @@ FutureOr<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
 class NameForCharacteristic extends _$NameForCharacteristic {
   @override
   Future<String> build(BleCharacteristic characteristic) async {
-    const servicesPath = 'packages/riverpod_ble/files/yaml/descriptors.yaml';
+    const servicesPath =
+        'packages/riverpod_ble/files/yaml/characteristic_uuids.yaml';
     final completer = Completer<String>();
     final uuid = characteristic.characteristicUuid;
 
