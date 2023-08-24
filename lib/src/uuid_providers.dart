@@ -66,11 +66,11 @@ Future<String> nameFor(NameForRef ref, BleUUID bleUUID, String yamlPath) async {
 
   if (bleUUID.isShort) {
     // Try to lookup
-    _logger.fine("nameForService: short lookup uuid=$bleUUID");
+    _logger.fine("nameFor: short lookup uuid=$bleUUID");
     ref.listen(
       uuidDefinitionsFromYamlProvider(yamlPath),
       (previous, next) {
-        _logger.fine("nameForService: previous=$previous next=$next");
+        _logger.fine("nameFor: previous=$previous next=$next");
         next.map(
           data: (value) {
             final def = ref
