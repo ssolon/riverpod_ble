@@ -162,7 +162,10 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   Future<List<BluetoothService>> servicesFrom(BluetoothDevice device) async {
     _logger.fine("servicesFrom");
     // return Future.value((await device.servicesStream.toList()).first);
-    return Future.value(device.servicesList);
+
+    final services = device.servicesList ?? await device.discoverServices();
+
+    return Future.value(services);
   }
 
   @override
@@ -227,7 +230,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
     final native = deviceFor(deviceId, name);
 
     try {
-      final services = await native.discoverServices();
+      final services = await servicesFrom(native);
       final result = <BleService>[
         for (final s in services) bleServiceFor(s, name),
       ];
@@ -794,9 +797,9 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
                 serviceUuid: serviceUuid,
                 characteristicUuid: characteristicUuid,
               );
-              completer.complete(BleRawValue(values: value));
+              state = AsyncData(BleRawValue(values: value));
             },
-            error: (error, stackTrace) => throw error,
+            error: (error, stackTrace) => AsyncError(error, stackTrace),
             loading: () {
               // ignore
             },
