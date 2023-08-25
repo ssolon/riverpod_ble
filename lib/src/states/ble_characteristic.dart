@@ -8,7 +8,7 @@ part 'ble_characteristic.g.dart';
 class BleCharacteristic with _$BleCharacteristic {
   factory BleCharacteristic({
     required String deviceId,
-    String? deviceName,
+    required String deviceName,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
     required BleCharacteristicProperties properties,
@@ -42,7 +42,7 @@ class BleCharacteristicProperties with _$BleCharacteristicProperties {
 class BleDescriptor with _$BleDescriptor {
   factory BleDescriptor({
     required String deviceId,
-    String? deviceName,
+    required String deviceName,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
     required BleUUID descriptorUuid,

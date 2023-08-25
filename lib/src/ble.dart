@@ -52,10 +52,10 @@ abstract class _Ble<T, S, C, D> {
   Future<List<S>> servicesFrom(T native);
 
   /// Return the device for [deviceId] or create a new one
-  T deviceFor(String deviceId, String? name) {
+  T deviceFor(String deviceId, String name) {
     return switch (device(deviceId)) {
       T d => d,
-      _ => register(nativeFrom(deviceId: deviceId, name: name ?? '')),
+      _ => register(nativeFrom(deviceId: deviceId, name: name)),
     };
   }
 
@@ -71,7 +71,7 @@ abstract class _Ble<T, S, C, D> {
   Future<List<BleDevice>> connectedDevices();
 
   /// Connect to a device [deviceId]
-  Future<void> connectTo(String deviceId);
+  Future<void> connectTo(String deviceId, String deviceName);
 
   /// Return the services for [deviceId]
   Future<List<BleService>> servicesFor(String deviceId, String name);
@@ -79,13 +79,13 @@ abstract class _Ble<T, S, C, D> {
   /// Disconnect from device
   Future<void> disconnectFrom(String deviceId, String name);
 
-  BleService bleServiceFor(S nativeService, String? deviceName);
+  BleService bleServiceFor(S nativeService, String deviceName);
   BleUUID serviceUuidFrom(S nativeService);
 
   Future<S> serviceFor(
-      BleUUID serviceUuid, String deviceId, String? name) async {
+      BleUUID serviceUuid, String deviceId, String name) async {
     _logger.fine("serviceFor");
-    final nativeDevice = nativeFrom(deviceId: deviceId, name: name ?? '');
+    final nativeDevice = nativeFrom(deviceId: deviceId, name: name);
     final services = await servicesFrom(nativeDevice);
     final nativeService =
         services.where((e) => serviceUuidFrom(e) == serviceUuid);
@@ -99,10 +99,10 @@ abstract class _Ble<T, S, C, D> {
   List<C> characteristicsFrom(S nativeService);
   BleUUID characteristicUuidFrom(C nativeCharacteristic);
   BleCharacteristic bleCharacteristicFor(
-      C nativeCharacteristic, String? deviceName);
+      C nativeCharacteristic, String deviceName);
 
   Future<C> characteristicFor(BleUUID characteristicUuid, BleUUID serviceUuid,
-      String deviceId, String? name) async {
+      String deviceId, String name) async {
     _logger.fine("characteristicFor");
     final nativeService = serviceFor(serviceUuid, deviceId, name);
     final characteristics = characteristicsFrom(await nativeService);
@@ -122,10 +122,10 @@ abstract class _Ble<T, S, C, D> {
 
   List<D> descriptorsFrom(C nativeCharacteristic);
   BleUUID descriptorUuidFrom(D nativeDescriptor);
-  BleDescriptor bleDescriptorFor(D nativeDescriptor, String? deviceName);
+  BleDescriptor bleDescriptorFor(D nativeDescriptor, String deviceName);
 
   Future<D> descriptorFor(BleUUID descriptorUuid, BleUUID characteristicUuid,
-      BleUUID serviceUuid, String deviceId, String? name) async {
+      BleUUID serviceUuid, String deviceId, String name) async {
     final nativeCharacteristic =
         characteristicFor(characteristicUuid, serviceUuid, deviceId, name);
     final descriptors = descriptorsFrom(await nativeCharacteristic);
@@ -209,7 +209,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  Future<BleDevice> connectTo(String id, {String? name}) async {
+  Future<BleDevice> connectTo(String id, String name) async {
     final native = deviceFor(id, name);
     await native.connect();
     return Future.value(bleDeviceFor(native));
@@ -243,7 +243,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
 
   @override
   BleCharacteristic bleCharacteristicFor(
-      BluetoothCharacteristic c, String? deviceName) {
+      BluetoothCharacteristic c, String deviceName) {
     final deviceId = c.remoteId.str;
 
     return BleCharacteristic(
@@ -270,7 +270,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleDescriptor bleDescriptorFor(BluetoothDescriptor d, String? deviceName) {
+  BleDescriptor bleDescriptorFor(BluetoothDescriptor d, String deviceName) {
     final deviceId = d.remoteId.str;
     return BleDescriptor(
       deviceId: deviceId,
@@ -282,7 +282,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleService bleServiceFor(BluetoothService s, String? deviceName) {
+  BleService bleServiceFor(BluetoothService s, String deviceName) {
     final deviceId = s.remoteId.str;
     return BleService(
       deviceId,
@@ -575,7 +575,7 @@ class BleConnection extends _$BleConnection {
 
   FutureOr<BleDevice> connect() async {
     try {
-      final device = await _ble.connectTo(deviceId);
+      final device = await _ble.connectTo(deviceId, name);
       _logger.finest('BleConnection: connected');
       return device;
     } catch (e) {
@@ -655,10 +655,10 @@ class BleServicesFor extends _$BleServicesFor {
   @override
   FutureOr<List<BleService>> build(
     String deviceId,
-    String? name,
+    String name,
   ) async {
     _logger.finest('bleServicesFor: start');
-    ref.listen(bleConnectionProvider(deviceId, name ?? ''), (previous, next) {
+    ref.listen(bleConnectionProvider(deviceId, name), (previous, next) {
       next.when(
         loading: () {
           _logger.finest('bleServicesFor: loading');
@@ -669,7 +669,7 @@ class BleServicesFor extends _$BleServicesFor {
 
           // Connected, discover services
           try {
-            final result = await _ble.servicesFor(deviceId, name ?? '');
+            final result = await _ble.servicesFor(deviceId, name);
             _logger.finest('bleServicesFor: got services');
             state = AsyncData(result);
           } catch (e, stack) {
@@ -772,7 +772,7 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
   @override
   Future<BleRawValue> build({
     required String deviceId,
-    String? deviceName,
+    required String deviceName,
     required BleUUID serviceUuid,
     required characteristicUuid,
   }) async {
@@ -793,7 +793,7 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
               }
               final value = await _ble.readCharacteristic(
                 deviceId: deviceId,
-                deviceName: deviceName ?? '',
+                deviceName: deviceName,
                 serviceUuid: serviceUuid,
                 characteristicUuid: characteristicUuid,
               );
@@ -910,7 +910,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
   @override
   Future<List<int>> build(
     String deviceId,
-    String? name,
+    String name,
     BleUUID serviceUuid,
     BleUUID characteristicUuid,
     BleUUID descriptorUuid,
@@ -936,7 +936,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                 }
                 final value = await _ble.readDescriptor(
                     deviceId: deviceId,
-                    name: name ?? '',
+                    name: name,
                     serviceUuid: serviceUuid,
                     characteristicUuid: characteristicUuid,
                     descriptorUuid: descriptorUuid);
@@ -992,7 +992,7 @@ class BleConnectionException extends RiverpodBleException {
 class UnknownService extends RiverpodBleException {
   final BleUUID serviceUuid;
   final String deviceId;
-  final String? name;
+  final String name;
   final String? reason;
 
   const UnknownService(this.serviceUuid, this.deviceId, this.name,
@@ -1008,7 +1008,7 @@ class CharacteristicException extends RiverpodBleException {
   final BleUUID characteristicUuid;
   final BleUUID serviceUuid;
   final String deviceId;
-  final String? deviceName;
+  final String deviceName;
   final String? reason;
 
   const CharacteristicException({
@@ -1077,7 +1077,7 @@ class UnknownDescriptor extends RiverpodBleException {
   final BleUUID characteristicUuid;
   final BleUUID serviceUuid;
   final String deviceId;
-  final String? name;
+  final String name;
 
   const UnknownDescriptor(
     this.descriptorUuid,

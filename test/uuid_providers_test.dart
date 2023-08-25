@@ -143,6 +143,7 @@ void main() {
     final tc = BleCharacteristic(
       characteristicUuid: BleUUID('0653e86c-10b0-419b-8aeb-cc273d243663'),
       deviceId: 'dummy',
+      deviceName: 'dummy name',
       serviceUuid: BleUUID('1a56b5ed-8c11-44de-b933-5580c9c053d9'),
       properties: BleCharacteristicProperties(
         broadcast: false,

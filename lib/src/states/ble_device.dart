@@ -12,13 +12,13 @@ class BleDevice<T> with _$BleDevice {
 
   factory BleDevice.scanned({
     required String deviceId,
-    String? name,
+    required String name,
     @Default([]) List<BleUUID> services,
   }) = Scanned;
 
   factory BleDevice({
     required String deviceId,
-    String? name,
+    required String name,
     required T nativeDevice,
     @Default([]) List<BleUUID> services,
     required BleConnectionState status,
@@ -26,7 +26,7 @@ class BleDevice<T> with _$BleDevice {
 
   factory BleDevice.error({
     required String deviceId,
-    String? name,
+    required String name,
     required Object error,
     StackTrace? stack,
   }) = Error;

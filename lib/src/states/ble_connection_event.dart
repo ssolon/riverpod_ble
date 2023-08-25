@@ -8,7 +8,7 @@ part 'ble_connection_event.freezed.dart';
 class BleConnectionEvent with _$BleConnectionEvent {
   factory BleConnectionEvent({
     required String deviceId,
-    String? name,
+    required String name,
     required BleConnectionState status,
   }) = _BleConnectionEvent;
 

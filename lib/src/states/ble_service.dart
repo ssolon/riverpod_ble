@@ -7,7 +7,7 @@ part 'ble_service.freezed.dart';
 class BleService with _$BleService {
   factory BleService(
     String deviceId,
-    String? deviceName,
+    String deviceName,
     BleUUID serviceUuid,
     List<BleCharacteristic> characteristics, {
     @Default(false) bool isPrimary,
