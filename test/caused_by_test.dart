@@ -195,9 +195,17 @@ void main() {
       expect(result, t3);
     });
 
-    test('Should find by super class', () {
+    test('Should find by super base class', () {
       final result = t3.isCaused((o) => o is TBase);
       expect(result, t3, reason: 'All are base class');
+    });
+    test('Should find by super class', () {
+      final result = t3.isCaused((o) => o is T1Opt);
+      expect(result, t1, reason: 'T2Opt is first subclass of T1Opt');
+    });
+    test('Should find by exact class', () {
+      final result = t3.isCaused((o) => o is T2Var);
+      expect(result, t0);
     });
   });
 }
