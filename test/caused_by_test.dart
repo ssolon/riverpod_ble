@@ -96,14 +96,14 @@ void main() {
       final tb1 = TBase('Tb1');
       final tb2 = TBase('Tb2', causedBy: tb1);
 
-      expect(tb2.toString(), 'Tb2: causedBy:Tb1:');
+      expect(tb2.toString(), 'Tb2: causedBy: Tb1:');
     });
 
     test('Two level causedBy', () {
       final tb1 = TBase('Tb1');
       final tb2 = TBase('Tb2', causedBy: tb1);
       final tb3 = TBase('Tb3', causedBy: tb2);
-      expect(tb3.toString(), 'Tb3: causedBy:Tb2: causedBy:Tb1:');
+      expect(tb3.toString(), 'Tb3: causedBy: Tb2: causedBy: Tb1:');
     });
   });
 
@@ -141,8 +141,8 @@ void main() {
       expect(
           tb2.toString(),
           "T2Var: v1='  leading/trailing space ' v2=v2"
-          " causedBy:T1Var: v1='Some stuff'"
-          " causedBy:TBase:");
+          " causedBy: T1Var: v1='Some stuff'"
+          " causedBy: TBase:");
     });
   });
 
@@ -164,7 +164,7 @@ void main() {
     test('Mixture of opts and causedBy', () {
       final to1 = T1Opt('T1Opt', o1: '');
       final to2 = T2Opt('T2Opt', o1: '', o2: 'Something else', causedBy: to1);
-      expect("$to2", "T2Opt: o2='Something else' causedBy:T1Opt:");
+      expect("$to2", "T2Opt: o2='Something else' causedBy: T1Opt:");
     });
   });
 
@@ -204,8 +204,8 @@ void main() {
       expect(result, t1, reason: 'T2Opt is first subclass of T1Opt');
     });
     test('Should find by exact class', () {
-      final result = t3.isCaused((o) => o is T2Var);
-      expect(result, t0);
+      final result = t3.isCaused((o) => o is T2Opt);
+      expect(result, t1);
     });
   });
 }
