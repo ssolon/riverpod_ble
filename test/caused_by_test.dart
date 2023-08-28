@@ -20,6 +20,14 @@ class T1Var extends TBase {
   String toString() => exceptionMessage(message, [(n: 'v1', v: v1)], []);
 }
 
+class T1VarOverride extends T1Var {
+  final String overrideMessage;
+  T1VarOverride(super.message, this.overrideMessage);
+
+  @override
+  String formatBase(String s) => super.formatBase(overrideMessage);
+}
+
 class T2Var extends T1Var {
   final Object? v2;
   T2Var(super.message, {this.v2, required super.v1, super.causedBy});
@@ -27,6 +35,20 @@ class T2Var extends T1Var {
   @override
   String toString() =>
       exceptionMessage(message, [(n: 'v1', v: v1), (n: 'v2', v: v2)], []);
+}
+
+class T2VarFunctionValue extends T2Var {
+  T2VarFunctionValue(super.message, {super.v1, super.v2, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        super.message,
+        [],
+        [
+          (n: 'v1', v: (name) => "$name-$v1"),
+          (n: 'v2', v: v2),
+        ],
+      );
 }
 
 class T1Opt extends TBase {
@@ -44,6 +66,20 @@ class T2Opt extends T1Opt {
   @override
   String toString() =>
       exceptionMessage(message, [], [(n: 'o1', v: o1), (n: 'o2', v: o2)]);
+}
+
+class T2OptFunctionValue extends T2Opt {
+  T2OptFunctionValue(super.message, {super.o1, super.o2, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        super.message,
+        [],
+        [
+          (n: 'o1', v: o1),
+          (n: 'o2', v: (name) => "$name-$o2"),
+        ],
+      );
 }
 
 class T3 extends TBase {
@@ -207,6 +243,24 @@ void main() {
     test('Should find by exact class', () {
       final result = t3.isCaused((o) => o is T2Opt);
       expect(result, t1);
+    });
+  });
+
+  group('Override tests', () {
+    test('Override base string', () {
+      final result = T1VarOverride('Original message', 'Override message');
+      expect(result.toString(), 'Override message: v1=<null>');
+    });
+
+    test('Var value as function ', () {
+      final result = T2VarFunctionValue('T2VarFunction', v1: 'One 1', v2: 'v2');
+      expect("$result", "T2VarFunction: v1='v1-One 1' v2=v2");
+    });
+
+    test('Opt value as function ', () {
+      final result =
+          T2OptFunctionValue('T2OptFunction', o1: 'One', o2: 'Two 2');
+      expect("$result", "T2OptFunction: o1=One o2='o2-Two 2'");
     });
   });
 }

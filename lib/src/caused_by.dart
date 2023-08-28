@@ -127,7 +127,7 @@ mixin CausedBy {
   ///
   /// Default is name=value where value is formatted by [formatValue].
   String formatVarItem(MsgVarDef def) {
-    return "${def.n}=${formatValue(def.v)}";
+    return "${def.n}=${formatValue(def.n, def.v)}";
   }
 
   /// Format an opt item [def].
@@ -155,9 +155,13 @@ mixin CausedBy {
 
   /// Format a value to add to the message.
   ///
-  /// Default is to use toString() or call [formatNullValue] for nulls.
-  String formatValue(Object? value) {
-    final valueString = value == null ? formatNullValue() : value.toString();
+  /// If [value] is a function with one parameter it will be called with the
+  /// name as the parameter otherwise default is to use toString() or call
+  /// [formatNullValue] for nulls.
+  String formatValue(String name, Object? value) {
+    final v = (value != null && value is Function) ? value(name) : value;
+
+    final valueString = v == null ? formatNullValue() : v.toString();
     return formatQuotedString(valueString);
   }
 
