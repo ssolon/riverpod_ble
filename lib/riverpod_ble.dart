@@ -8,3 +8,4 @@ export "src/states/ble_characteristic.dart";
 export "src/states/ble_value.dart";
 export "src/states/ble_connection_state.dart";
 export "src/uuid_providers.dart";
+export "src/ble_exceptions.dart";

@@ -221,7 +221,7 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
       final native = deviceFor(id, name);
       native.disconnect();
     } catch (e) {
-      return Future.error("disconnecFrom $id/$name error=$e");
+      return Future.error(BleDisconnectException(id, name, '', causedBy: e));
     }
   }
 
@@ -624,7 +624,7 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
         loading: () => state = const AsyncLoading(),
         error: (error, stackTrace) {
           state = AsyncError(
-              BleConnectionException(deviceId, deviceName, error.toString()),
+              BleConnectionException(deviceId, deviceName, '', causedBy: error),
               stackTrace);
         },
       );
@@ -759,7 +759,8 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
   }
 
   _failed(e) => CharacteristicException(
-      reason: "Exception accessing characteristic=$e",
+      reason: "Exception accessing characteristic",
+      causedBy: e,
       characteristicUuid: characteristicUuid,
       serviceUuid: serviceUuid,
       deviceId: deviceId,
@@ -788,8 +789,12 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
               final s = services.where((e) => e.serviceUuid == serviceUuid);
 
               if (s.isEmpty) {
-                throw UnknownService(serviceUuid, deviceId, deviceName,
-                    "Reading characteristic $characteristicUuid");
+                throw UnknownService(
+                  serviceUuid,
+                  deviceId,
+                  deviceName,
+                  reason: "Reading characteristic $characteristicUuid",
+                );
               }
               final value = await _ble.readCharacteristic(
                 deviceId: deviceId,
@@ -886,6 +891,7 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
   }
 
   _failed(e) => FailedToEnableNotification(
+        causedBy: e,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
         deviceId: deviceId,
@@ -932,7 +938,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
 
                 if (s.isEmpty) {
                   throw UnknownService(serviceUuid, deviceId, name,
-                      "Reading descriptor $descriptorUuid");
+                      reason: "Reading descriptor $descriptorUuid");
                 }
                 final value = await _ble.readDescriptor(
                     deviceId: deviceId,
@@ -942,14 +948,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                     descriptorUuid: descriptorUuid);
                 state = AsyncData(value);
               } catch (e, t) {
-                state = AsyncError(
-                    "Exception reading value of "
-                    " descriptor=$descriptorUuid"
-                    " for device=$deviceId/$name"
-                    " service=$serviceUuid"
-                    " characteristic=$characteristicUuid"
-                    ":=$e",
-                    t);
+                state = _fail(e, t);
               }
             },
             error: (error, stackTrace) => state = AsyncError(error, stackTrace),
@@ -959,136 +958,19 @@ class BleDescriptorValue extends _$BleDescriptorValue {
         fireImmediately: true,
       );
     } catch (e) {
-      // TODO more specific error message
-      state = AsyncError(e, StackTrace.current);
+      state = _fail(e, StackTrace.current);
     }
 
     return completer.future;
   }
-}
 
-////////////////////////////////////////////////////////////////////////////
-/// Exceptions
-////////////////////////////////////////////////////////////////////////////
-
-/// Marker class for one our exceptions
-abstract class RiverpodBleException implements Exception {
-  const RiverpodBleException();
-}
-
-@immutable
-class BleConnectionException extends RiverpodBleException {
-  final String deviceId;
-  final String deviceName;
-  final String reason;
-
-  const BleConnectionException(this.deviceId, this.deviceName, this.reason);
-
-  @override
-  String toString() => "Failed to connect to $deviceName ($deviceId): $reason";
-}
-
-@immutable
-class UnknownService extends RiverpodBleException {
-  final BleUUID serviceUuid;
-  final String deviceId;
-  final String name;
-  final String? reason;
-
-  const UnknownService(this.serviceUuid, this.deviceId, this.name,
-      [this.reason]);
-
-  @override
-  String toString() =>
-      "Unknown service=$serviceUuid for device=$deviceId/$name $reason";
-}
-
-@immutable
-class CharacteristicException extends RiverpodBleException {
-  final BleUUID characteristicUuid;
-  final BleUUID serviceUuid;
-  final String deviceId;
-  final String deviceName;
-  final String? reason;
-
-  const CharacteristicException({
-    required this.characteristicUuid,
-    required this.serviceUuid,
-    required this.deviceId,
-    required this.deviceName,
-    this.reason,
-  });
-
-  @override
-  String toString() {
-    final r = reason != null ? " reason=$reason:" : '';
-    return "$r"
-        " characteristic=$characteristicUuid"
-        " serviceUuid=$serviceUuid"
-        " device=$deviceId/$deviceName";
-  }
-}
-
-@immutable
-class UnknownCharacteristic extends CharacteristicException {
-  const UnknownCharacteristic({
-    required super.characteristicUuid,
-    required super.serviceUuid,
-    required super.deviceId,
-    required super.deviceName,
-    super.reason,
-  });
-
-  @override
-  String toString() => "Unknown characteristic: ${super.toString()}";
-}
-
-@immutable
-class FailedToEnableNotification extends CharacteristicException {
-  const FailedToEnableNotification({
-    required super.characteristicUuid,
-    required super.serviceUuid,
-    required super.deviceId,
-    required super.deviceName,
-    super.reason,
-  });
-
-  @override
-  String toString() => "Failed to enable notification: ${super.toString()}";
-}
-
-@immutable
-class ReadingCharacteristicException extends CharacteristicException {
-  const ReadingCharacteristicException({
-    required super.characteristicUuid,
-    required super.serviceUuid,
-    required super.deviceId,
-    required super.deviceName,
-    super.reason,
-  });
-
-  @override
-  String toString() => "Failed to read characteristic: ${super.toString()}";
-}
-
-@immutable
-class UnknownDescriptor extends RiverpodBleException {
-  final BleUUID descriptorUuid;
-  final BleUUID characteristicUuid;
-  final BleUUID serviceUuid;
-  final String deviceId;
-  final String name;
-
-  const UnknownDescriptor(
-    this.descriptorUuid,
-    this.characteristicUuid,
-    this.serviceUuid,
-    this.deviceId,
-    this.name,
-  );
-
-  @override
-  String toString() => "Unknown descriptor=$descriptorUuid"
-      " characteristic=$characteristicUuid"
-      " service=$serviceUuid for device=$deviceId/$name";
+  AsyncValue<List<int>> _fail(e, t) => AsyncError<List<int>>(
+      CharacteristicException(
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          deviceName: name,
+          reason: 'Reading descriptor value',
+          causedBy: e),
+      t);
 }
