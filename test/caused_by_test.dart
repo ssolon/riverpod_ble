@@ -82,6 +82,35 @@ class T2OptFunctionValue extends T2Opt {
       );
 }
 
+class T2OptFunctionNoValueNull extends T2Opt {
+  T2OptFunctionNoValueNull(super.message, {super.o1, super.o2, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        super.message,
+        [],
+        [
+          (n: 'o1', v: o1),
+          (n: 'o2', v: (name) => null),
+        ],
+      );
+}
+
+class T2OptFunctionNoValueBlank extends T2Opt {
+  T2OptFunctionNoValueBlank(super.message,
+      {super.o1, super.o2, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        super.message,
+        [],
+        [
+          (n: 'o1', v: o1),
+          (n: 'o2', v: (name) => null),
+        ],
+      );
+}
+
 class T3 extends TBase {
   final Object? v1;
   final Object? v2;
@@ -256,11 +285,24 @@ void main() {
       final result = T2VarFunctionValue('T2VarFunction', v1: 'One 1', v2: 'v2');
       expect("$result", "T2VarFunction: v1='v1-One 1' v2=v2");
     });
+  });
 
-    test('Opt value as function ', () {
+  group('Opt value as function', () {
+    test('Opt value as function returns value', () {
       final result =
           T2OptFunctionValue('T2OptFunction', o1: 'One', o2: 'Two 2');
       expect("$result", "T2OptFunction: o1=One o2='o2-Two 2'");
+    });
+
+    test('Opt value as function returns null', () {
+      final result =
+          T2OptFunctionNoValueNull('T2OptFunction', o1: 'One', o2: 'Two 2');
+      expect("$result", "T2OptFunction: o1=One");
+    });
+    test('Opt value as function returns "' '', () {
+      final result =
+          T2OptFunctionNoValueBlank('T2OptFunction', o1: 'One', o2: 'Two 2');
+      expect("$result", "T2OptFunction: o1=One");
     });
   });
 }
