@@ -13,16 +13,16 @@ class TBase with CausedBy {
 }
 
 class T1Var extends TBase {
-  final Object v1;
-  T1Var(super.message, {required this.v1, super.causedBy});
+  final Object? v1;
+  T1Var(super.message, {this.v1, super.causedBy});
 
   @override
   String toString() => exceptionMessage(message, [(n: 'v1', v: v1)], []);
 }
 
 class T2Var extends T1Var {
-  final Object v2;
-  T2Var(super.message, {required this.v2, required super.v1, super.causedBy});
+  final Object? v2;
+  T2Var(super.message, {this.v2, required super.v1, super.causedBy});
 
   @override
   String toString() =>
@@ -30,16 +30,16 @@ class T2Var extends T1Var {
 }
 
 class T1Opt extends TBase {
-  final Object o1;
-  T1Opt(super.message, {required this.o1, super.causedBy});
+  final Object? o1;
+  T1Opt(super.message, {this.o1, super.causedBy});
 
   @override
   String toString() => exceptionMessage(message, [], [(n: 'o1', v: o1)]);
 }
 
 class T2Opt extends T1Opt {
-  final Object o2;
-  T2Opt(super.message, {required super.o1, required this.o2, super.causedBy});
+  final Object? o2;
+  T2Opt(super.message, {super.o1, required this.o2, super.causedBy});
 
   @override
   String toString() =>
@@ -47,20 +47,14 @@ class T2Opt extends T1Opt {
 }
 
 class T3 extends TBase {
-  final Object v1;
-  final Object v2;
-  final Object v3;
-  final Object o1;
-  final Object o2;
-  final Object o3;
+  final Object? v1;
+  final Object? v2;
+  final Object? v3;
+  final Object? o1;
+  final Object? o2;
+  final Object? o3;
   T3(super.message,
-      {required this.v1,
-      required this.v2,
-      required this.v3,
-      required this.o1,
-      required this.o2,
-      required this.o3,
-      super.causedBy});
+      {this.v1, this.v2, this.v3, this.o1, this.o2, this.o3, super.causedBy});
 
   T3.init(super.message, {super.causedBy})
       : v1 = 'v1',
