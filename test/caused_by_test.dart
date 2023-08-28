@@ -65,10 +65,11 @@ class T3 extends TBase {
         o3 = 'o3';
 
   @override
-  String toString() => exceptionMessage(message, [], [
+  String toString() => exceptionMessage(message, [
         (n: 'v1', v: v1),
         (n: 'v2', v: v2),
         (n: 'v3', v: v3),
+      ], [
         (n: 'o1', v: o1),
         (n: 'o2', v: o2),
         (n: 'o3', v: o3)
@@ -162,6 +163,12 @@ void main() {
     });
   });
 
+  group('Nullable values for vars and opts', () {
+    test('Nullable vars', () {
+      final t = T3('t');
+      expect(t.toString(), "t: v1=<null> v2=<null> v3=<null>");
+    });
+  });
   group('Vars and Opts', () {
     test('Full House', () {
       final t3 =
