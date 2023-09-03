@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_ble/riverpod_ble.dart';
+
+// ignore_for_file: unused_local_variable
 
 class TBase with CausedBy {
   @override
@@ -275,6 +276,45 @@ void main() {
     });
   });
 
+  group('Root tests', () {
+    test('Only non causedBy', () {
+      final r = Exception('non-caused');
+      expect(CausedBy.rootCause(r), r, reason: 'Finds self');
+    });
+
+    test('Only one causedBy', () {
+      final r = T1Var('r');
+      expect(CausedBy.rootCause(r), r, reason: 'Finds self');
+    });
+
+    test('Two causedBy', () {
+      final r = T1Var('r');
+      final t = T2Var('n', v1: 'v1', causedBy: r);
+      expect(CausedBy.rootCause(t), r);
+    });
+
+    test('Two causedBy to non causedBy', () {
+      final r = Exception();
+      final n = T1Var('n', causedBy: r);
+      final t = T2Var('t', v1: 'v1', causedBy: n);
+      expect(CausedBy.rootCause(t), r);
+    });
+
+    test('Three causedBy', () {
+      final r = T1Var('r');
+      final n = T1Opt('n', causedBy: r);
+      final t = T2Var('t', v1: 'v1', causedBy: n);
+      expect(CausedBy.rootCause(t), r);
+    });
+
+    test('Three causedBy to non causedBy', () {
+      final r = Exception();
+      final n1 = T1Var('n1', causedBy: r);
+      final n2 = T1Opt('n2', causedBy: n1);
+      final t = T2Var('t', v1: 'v1', causedBy: n2);
+      expect(CausedBy.rootCause(t), r);
+    });
+  });
   group('Override tests', () {
     test('Override base string', () {
       final result = T1VarOverride('Original message', 'Override message');

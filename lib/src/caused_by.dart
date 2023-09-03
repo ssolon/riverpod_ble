@@ -100,6 +100,22 @@ mixin CausedBy {
     return null;
   }
 
+  /// Return the last (or only) object in the [causedBy] chain.
+  static Object rootCause(Object start) {
+    Object root = start;
+
+    while (root is CausedBy) {
+      final check = root.causedBy;
+      if (check != null) {
+        root = check;
+      } else {
+        break;
+      }
+    }
+
+    return root;
+  }
+
   /// Format a message for an exception using [base], [vars] and [opts].
   ///
   /// The [base] string will be followed by "key=value" pairs from [vars],
