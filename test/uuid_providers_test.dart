@@ -7,6 +7,8 @@ import 'package:simple_logger/simple_logger.dart';
 
 const servicesYamlPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
 
+// ignore_for_file: unused_local_variable, avoid_print
+
 void main() {
   SimpleLogger().setLevel(Level.ALL);
 

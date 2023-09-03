@@ -44,8 +44,7 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
 
       return Future.value();
     } catch (e) {
-      return Future.error(
-          "Exception loading uuid definitions from '$yamlFilePath': $e");
+      return Future.error(UuidDefinitionException(yamlFilePath, causedBy: e));
     }
   }
 
@@ -82,8 +81,8 @@ Future<String> nameFor(NameForRef ref, BleUUID bleUUID, String yamlPath) async {
             }
             completer.complete(result);
           },
-          error: (error) => completer
-              .completeError("Error getting name for $bleUUID: error=$error"),
+          error: (error) => completer.completeError(
+              BleUuidNameException(bleUUID, yamlPath, causedBy: error)),
           loading: (loading) {},
         );
       },
@@ -150,28 +149,13 @@ class NameForCharacteristic extends _$NameForCharacteristic {
                         n = String.fromCharCodes(values);
                         state = AsyncData(n);
                       },
-                      error: (error, stackTrace) {
-                        state = AsyncError(
-                            "Exception getting nameForCharacteristic for"
-                            " device=${characteristic.deviceId}/${characteristic.deviceName}"
-                            " service=${characteristic.serviceUuid}"
-                            " characteristic=${characteristic.characteristicUuid}"
-                            ": $error",
-                            stackTrace);
-                      },
+                      error: _fail,
                       loading: () => state = const AsyncLoading(),
                     );
                   },
                 );
               } catch (e, t) {
-                state = AsyncError(
-                    "Exception getting user description for"
-                    " deviceId=${d.deviceId}"
-                    " service=${d.serviceUuid}"
-                    " characteristic=${d.characteristicUuid}"
-                    " descriptor=${d.descriptorUuid}"
-                    ": $e",
-                    t);
+                _fail(e, t);
               }
             }
           } else {
@@ -186,6 +170,16 @@ class NameForCharacteristic extends _$NameForCharacteristic {
 
     return completer.future;
   }
+
+  _fail(e, t) => state = AsyncError(
+      BleNameForCharacteristicException(
+        characteristicUuid: characteristic.characteristicUuid,
+        serviceUuid: characteristic.serviceUuid,
+        deviceId: characteristic.deviceId,
+        deviceName: characteristic.deviceName,
+        causedBy: e,
+      ),
+      t);
 }
 
 bool isUserDescriptor(BleDescriptor d) => d.descriptorUuid.shortUUID == 0x2901;

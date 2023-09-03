@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:mutex/mutex.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -44,6 +45,9 @@ abstract class _Ble<T, S, C, D> {
 
   /// Get the connection status of a native device
   FutureOr<BleConnectionState> connectionStatusOf(T native);
+
+  /// Get the connection state by deviceId
+  FutureOr<bool> isConnected(String deviceId, String name);
 
   /// Get a stream of connection state
   Stream<BleConnectionState> connectionStreamFor(String deviceId, String name);
@@ -135,12 +139,20 @@ abstract class _Ble<T, S, C, D> {
     );
 
     if (nativeDescriptor.isEmpty) {
-      throw UnknownDescriptor(
-          descriptorUuid, characteristicUuid, serviceUuid, deviceId, name);
+      throw DescriptorException(
+          descriptorUuid: descriptorUuid,
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          name: name,
+          reason: 'Unknown descriptor');
     }
 
     return Future.value(nativeDescriptor.first);
   }
+
+  /// Return a user-friendly message for the non RiverpodBleException [e].
+  String exceptionDisplayMessage(Object o);
 }
 
 /// FlutterBluePlus variation
@@ -178,7 +190,8 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
         BluetoothConnectionState.connected => BleConnectionState.connected(),
         BluetoothConnectionState.disconnected =>
           BleConnectionState.disconnected(),
-        _ => throw "Unknown native connect state",
+        _ => throw const BleDisconnectException(
+            '???', '????', "Unknown native connect state"),
       };
 
   @override
@@ -206,6 +219,15 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
       result.add(await bleDeviceFor(d));
     }
     return result;
+  }
+
+  @override
+  FutureOr<bool> isConnected(String deviceId, String deviceName) async {
+    final connected = await connectedDevices();
+    _logger.fine("_ble.isConnected checking ${connected.length} devices");
+    return connected.any(
+      (e) => e.maybeMap((v) => v.deviceId == deviceId, orElse: () => false),
+    );
   }
 
   @override
@@ -237,7 +259,8 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
 
       return Future.value(result);
     } catch (e) {
-      return Future.error("Error discovering services for $name/$deviceId=$e");
+      return Future.error(BleServiceFetchException(deviceId, name,
+          causedBy: e, reason: 'Discovering services'));
     }
   }
 
@@ -325,11 +348,16 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
         _logger.fine('_ble: readDescriptor done $descriptorUuid');
         return Future.value(values);
       });
-    } catch (e) {
-      return Future.error("Exception reading descriptor $descriptorUuid"
-          " for device=$deviceId/$name"
-          " service=$serviceUuid"
-          " characteristic=$characteristicUuid = $e");
+    } catch (e, t) {
+      // TODO !!!! Figure out if descriptor isn't there and have own exception
+      return Future.error(DescriptorException(
+          descriptorUuid: descriptorUuid,
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          name: name,
+          causedBy: e,
+          reason: "Read descriptor"));
     }
   }
 
@@ -347,10 +375,14 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
         return Future.value(values);
       });
     } catch (e) {
-      return Future.error("Exception reading characteristic"
-          " for device=$deviceId/$deviceName"
-          " service=$serviceUuid"
-          " characteristic=$characteristicUuid = $e");
+      return Future.error(CharacteristicException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        causedBy: e,
+        reason: "Read characteristic",
+      ));
     }
   }
 
@@ -409,6 +441,18 @@ class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
   @override
   BleUUID serviceUuidFrom(BluetoothService nativeService) =>
       BleUUID(nativeService.uuid.toString());
+
+  @override
+  String exceptionDisplayMessage(Object o) {
+    final message = switch (o) {
+      FlutterBluePlusException blue => blue.description,
+      PlatformException platform => platform.message,
+      _ => null,
+    };
+
+    // If we didn't get anything fall back on [toString].
+    return message ?? o.toString();
+  }
 }
 
 /// Scanner for BLE devices.
@@ -579,7 +623,8 @@ class BleConnection extends _$BleConnection {
       _logger.finest('BleConnection: connected');
       return device;
     } catch (e) {
-      return Future.error(BleConnectionException(deviceId, name, e.toString()));
+      return Future.error(
+          BleConnectionException(deviceId, name, 'Connecting', causedBy: e));
     }
   }
 
@@ -674,11 +719,11 @@ class BleServicesFor extends _$BleServicesFor {
             state = AsyncData(result);
           } catch (e, stack) {
             _logger.finest("bleServicesFor: error=$e");
-            state = AsyncError(e, stack);
+            _fail(e, stack);
           }
         },
         // Error on connection
-        error: (error, stackTrace) => state = AsyncError(error, stackTrace),
+        error: _fail,
       );
     }, fireImmediately: true);
 
@@ -705,6 +750,11 @@ class BleServicesFor extends _$BleServicesFor {
 
     _logger.finest("bleServicesFor: done=${_completer.isCompleted}");
     return _completer.future;
+  }
+
+  void _fail(e, t) {
+    state =
+        AsyncError(BleServiceFetchException(deviceId, name, causedBy: e), t);
   }
 }
 
@@ -742,23 +792,23 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
                 );
                 state = AsyncData(_ble.bleCharacteristicFor(c, deviceName));
               } catch (e, t) {
-                state = AsyncError(_failed(e), t);
+                state = AsyncError(_fail(e), t);
               }
             }
           },
           error: (error, stackTrace) {
-            state = AsyncError(_failed(error), stackTrace);
+            state = AsyncError(_fail(error), stackTrace);
           },
           loading: () {},
         );
       });
     } catch (e, t) {
-      state = AsyncError(_failed(e), t);
+      state = AsyncError(_fail(e), t);
     }
     return completer.future;
   }
 
-  _failed(e) => CharacteristicException(
+  _fail(e) => CharacteristicException(
       reason: "Exception accessing characteristic",
       causedBy: e,
       characteristicUuid: characteristicUuid,
@@ -804,7 +854,7 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
               );
               state = AsyncData(BleRawValue(values: value));
             },
-            error: (error, stackTrace) => AsyncError(error, stackTrace),
+            error: _fail,
             loading: () {
               // ignore
             },
@@ -812,11 +862,22 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
         },
         fireImmediately: true,
       );
-    } catch (e) {
-      // TODO More specific error message
-      state = AsyncError(e, StackTrace.current);
+    } catch (e, t) {
+      state = _fail(e, t);
     }
     return completer.future;
+  }
+
+  _fail(e, t) {
+    state = AsyncError(
+        ReadCharacteristicException(
+          causedBy: e,
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          deviceName: deviceName,
+        ),
+        t);
   }
 }
 
@@ -876,21 +937,21 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
                   }
                 }
               } catch (e, t) {
-                state = AsyncError(_failed(e), t);
+                state = AsyncError(_fail(e), t);
               }
             },
-            error: (e, t) => state = AsyncError(_failed(e), t),
+            error: (e, t) => state = AsyncError(_fail(e), t),
             loading: () {},
           );
         },
       );
     } catch (e, t) {
-      state = AsyncError(_failed(e), t);
+      state = AsyncError(_fail(e), t);
     }
     return completer.future;
   }
 
-  _failed(e) => FailedToEnableNotification(
+  _fail(e) => FailedToEnableNotification(
         causedBy: e,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
@@ -951,7 +1012,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                 state = _fail(e, t);
               }
             },
-            error: (error, stackTrace) => state = AsyncError(error, stackTrace),
+            error: _fail,
             loading: () => const AsyncLoading(),
           );
         },
@@ -973,4 +1034,44 @@ class BleDescriptorValue extends _$BleDescriptorValue {
           reason: 'Reading descriptor value',
           causedBy: e),
       t);
+}
+
+/// See if we're connected based on the device information (if any) from [e]
+///
+/// Return true for connected, false for disconnected or null to don't know.
+FutureOr<bool?> bleIsConnectedFromException(Exception e) async {
+  BleDeviceInfo? deviceInfo = switch (e) {
+    CausedBy c => c.isCaused((o) => o is BleDeviceInfo) as BleDeviceInfo?,
+    BleDeviceInfo i => i,
+    _ => null,
+  };
+
+  if (deviceInfo == null) {
+    return null; // don't know
+  }
+
+  return await _ble.isConnected(deviceInfo.deviceId, deviceInfo.deviceName);
+}
+
+/// Return
+Future<String> bleExceptionDisplayMessage(Object e) async {
+  if (e is Exception) {
+    // If we're not connected -- nothing else matters so check that first
+
+    final maybeConnected = await bleIsConnectedFromException(e);
+    if (maybeConnected != null && !maybeConnected) {
+      return "Device is not connected";
+    }
+
+    // Let's start out by just displaying the rootCause
+
+    final root = CausedBy.rootCause(e);
+    return switch (root) {
+      RiverpodBleException ours => ours.toString(),
+      _ => _ble.exceptionDisplayMessage(root),
+    };
+  }
+
+  // Can't figure anything else just use toString()
+  return e.toString();
 }
