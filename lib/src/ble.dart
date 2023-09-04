@@ -679,20 +679,6 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
   }
 }
 
-/*!!!!
-@riverpod
-Future<List<BleService>> bleServicesFor(
-    BleServicesForRef ref, String deviceId, String name) async {
-  final connection = ref.watch(bleConnectionProvider(deviceId, name));
-  return connection.map(
-    loading: ,
-    data: (data) => Future.value(data),
-   
-   Future.error(
-      "bleServicesFor deviceId=$deviceId is not implemented yet");
-}
-!!!!*/
-
 @riverpod
 class BleServicesFor extends _$BleServicesFor {
   final _completer = Completer<List<BleService>>();
