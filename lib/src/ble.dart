@@ -1056,20 +1056,23 @@ FutureOr<bool?> bleIsConnectedFromException(Exception e) async {
 /// Return
 Future<String> bleExceptionDisplayMessage(Object e) async {
   if (e is Exception) {
-    // If we're not connected -- nothing else matters so check that first
-
-    final maybeConnected = await bleIsConnectedFromException(e);
-    if (maybeConnected != null && !maybeConnected) {
-      return "Device is not connected";
-    }
-
     // Let's start out by just displaying the rootCause
 
     final root = CausedBy.rootCause(e);
-    return switch (root) {
-      RiverpodBleException ours => ours.toString(),
-      _ => _ble.exceptionDisplayMessage(root),
-    };
+    if (root is RiverpodBleException) {
+      // If we're not connected -- nothing else matters so check that first
+      final maybeConnected = await bleIsConnectedFromException(e);
+      if (maybeConnected != null && !maybeConnected) {
+        return "Device is not connected";
+      }
+
+      // Connected -- return message from our exception
+      // TODO Add "displayMessage" method to RiverpodBleException?
+      return root.toString();
+    } else {
+      // Maybe process as native exception
+      return _ble.exceptionDisplayMessage(root);
+    }
   }
 
   // Can't figure anything else just use toString()
