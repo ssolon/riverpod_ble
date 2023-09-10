@@ -4,6 +4,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_ble/riverpod_ble.dart';
 
 part 'ble_value.freezed.dart';
+part 'ble_value.g.dart';
 
 /// Convert [rawValue] to a [BleValue] using [f] if provided otherwise use
 /// the [PresentationValue] from [rawValue] and if that's not there use
@@ -171,6 +172,9 @@ class BlePresentationFormat with _$BlePresentationFormat {
     int? gattNamespace,
     int? gannNdesc,
   }) = _BlePresentationFormat;
+
+  factory BlePresentationFormat.fromJson(Map<String, dynamic> json) =>
+      _$BlePresentationFormatFromJson(json);
 }
 
 /// Raw values returned from reading a characteristic
