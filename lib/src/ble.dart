@@ -139,13 +139,12 @@ abstract class _Ble<T, S, C, D> {
     );
 
     if (nativeDescriptor.isEmpty) {
-      throw DescriptorException(
+      throw UnknownDescriptorException(
           descriptorUuid: descriptorUuid,
           characteristicUuid: characteristicUuid,
           serviceUuid: serviceUuid,
           deviceId: deviceId,
-          name: name,
-          reason: 'Unknown descriptor');
+          name: name);
     }
 
     return Future.value(nativeDescriptor.first);

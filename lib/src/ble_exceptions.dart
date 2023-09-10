@@ -230,6 +230,22 @@ class DescriptorException extends RiverpodBleException with BleDeviceInfo {
 }
 
 @immutable
+class UnknownDescriptorException extends DescriptorException {
+  const UnknownDescriptorException({
+    required super.descriptorUuid,
+    required super.characteristicUuid,
+    required super.serviceUuid,
+    required super.deviceId,
+    required super.name,
+    super.reason,
+    super.causedBy,
+  });
+
+  @override
+  String formatBase(String base) => "Uknown descriptor";
+}
+
+@immutable
 class UuidDefinitionException extends RiverpodBleException {
   final String yamlFilePath;
 
