@@ -1,13 +1,9 @@
 import 'dart:async';
-
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:logging/logging.dart';
 import 'package:mutex/mutex.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:riverpod_ble/src/states/ble_connection_state.dart';
-import 'package:simple_logger/simple_logger.dart';
 import 'package:riverpod_ble/riverpod_ble.dart';
 import 'states/ble_scan_result.dart';
 
@@ -18,7 +14,7 @@ part 'ble.g.dart';
 
 final _ble = _FlutterBluePlusBle();
 
-final _logger = SimpleLogger();
+final _logger = Logger("RiverpoBLE");
 
 /// Internal state for the Ble module
 /// Should be a singleton since it holds device states.

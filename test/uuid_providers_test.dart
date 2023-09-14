@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_ble/riverpod_ble.dart';
-import 'package:simple_logger/simple_logger.dart';
+import 'package:logging/logging.dart';
 
 const servicesYamlPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
 
 // ignore_for_file: unused_local_variable, avoid_print
 
 void main() {
-  SimpleLogger().setLevel(Level.ALL);
+  Logger.root.level = Level.ALL;
 
   TestWidgetsFlutterBinding.ensureInitialized();
 

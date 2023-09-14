@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod_ble/riverpod_ble.dart';
-import 'package:simple_logger/simple_logger.dart';
+import 'package:logging/logging.dart';
 import 'package:yaml/yaml.dart';
 
 part 'uuid_providers.g.dart';
 
-final _logger = SimpleLogger();
+final _logger = Logger("UUidProviders");
 
 @immutable
 class UuidDef {
