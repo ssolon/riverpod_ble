@@ -14,7 +14,7 @@ part 'ble.g.dart';
 
 final _ble = _FlutterBluePlusBle();
 
-final _logger = Logger("RiverpoBLE");
+final _logger = Logger("RiverpodBLE");
 
 /// Internal state for the Ble module
 /// Should be a singleton since it holds device states.
