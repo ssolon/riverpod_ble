@@ -1,24 +1,44 @@
 import 'dart:async';
-import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
-import 'package:mutex/mutex.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:riverpod_ble/riverpod_ble.dart';
+import '../riverpod_ble.dart';
+import 'ble_flutter_blue_plus.dart';
 import 'states/ble_scan_result.dart';
 
 part 'ble.g.dart';
 
 /// Riverpod access to Bluetooth LE
-/// flutter_blue_plus variation
 
-final _ble = _FlutterBluePlusBle();
+final _ble = FlutterBluePlusBle();
 
 final _logger = Logger("RiverpodBLE");
 
 /// Internal state for the Ble module
 /// Should be a singleton since it holds device states.
-abstract class _Ble<T, S, C, D> {
+///
+/// Types:
+///   T = native device type
+///   S = native service type
+///   C = native characteristic type
+///   D = native descriptor type
+abstract class Ble<T, S, C, D> {
+  /// Scanner
+
+  /// Stream of scanner status (true = scanning)
+  Stream<bool> get scannerStatusStream;
+
+  /// Current state of scanner
+  bool get isScanningNow;
+
+  /// Stream of [BleScannedDevice] from scanner
+  Stream<List<BleScannedDevice>> get scannerResults;
+
+  /// Start the scanner with [timeout] default of 30 seconds
+  void startScan({Duration timeout = const Duration(seconds: 30)});
+
+  /// Stop the scanner
+  void stopScan();
+
   /// Keep track of the devices we know about at their native type
   Map<String, T> devices = {};
 
@@ -43,10 +63,11 @@ abstract class _Ble<T, S, C, D> {
   FutureOr<BleConnectionState> connectionStatusOf(T native);
 
   /// Get the connection state by deviceId
-  FutureOr<bool> isConnected(String deviceId, String name);
+  FutureOr<bool> isConnected(String deviceId, String deviceName);
 
   /// Get a stream of connection state
-  Stream<BleConnectionState> connectionStreamFor(String deviceId, String name);
+  Stream<BleConnectionState> connectionStreamFor(
+      String deviceId, String deviceName);
 
   /// Get the service (if present) from a native device
   Future<List<S>> servicesFrom(T native);
@@ -77,7 +98,7 @@ abstract class _Ble<T, S, C, D> {
   Future<List<BleService>> servicesFor(String deviceId, String name);
 
   /// Disconnect from device
-  Future<void> disconnectFrom(String deviceId, String name);
+  Future<void> disconnectFrom(String deviceId, String deviceName);
 
   BleService bleServiceFor(S nativeService, String deviceName);
   BleUUID serviceUuidFrom(S nativeService);
@@ -150,306 +171,6 @@ abstract class _Ble<T, S, C, D> {
   String exceptionDisplayMessage(Object o);
 }
 
-/// FlutterBluePlus variation
-class _FlutterBluePlusBle extends _Ble<BluetoothDevice, BluetoothService,
-    BluetoothCharacteristic, BluetoothDescriptor> {
-  _FlutterBluePlusBle() {
-    // TODO Make this settable somewhere
-    // TODO This needs to happen after bluetooth is initialized?
-    FlutterBluePlus.setLogLevel(LogLevel.info);
-  }
-
-  @override
-  String deviceIdOf(BluetoothDevice device) => device.remoteId.str;
-
-  @override
-  String nameOf(BluetoothDevice device) => device.localName;
-
-  @override
-  Future<List<BluetoothService>> servicesFrom(BluetoothDevice device) async {
-    _logger.fine("servicesFrom");
-    // return Future.value((await device.servicesStream.toList()).first);
-
-    final services = device.servicesList ?? await device.discoverServices();
-
-    return Future.value(services);
-  }
-
-  @override
-  FutureOr<BleConnectionState> connectionStatusOf(
-          BluetoothDevice native) async =>
-      Future.value(_connectionStateFrom(await native.connectionState.first));
-
-  BleConnectionState _connectionStateFrom(BluetoothConnectionState s) =>
-      switch (s) {
-        BluetoothConnectionState.connected => BleConnectionState.connected(),
-        BluetoothConnectionState.disconnected =>
-          BleConnectionState.disconnected(),
-        _ => throw const BleDisconnectException(
-            '???', '????', "Unknown native connect state"),
-      };
-
-  @override
-  Stream<BleConnectionState> connectionStreamFor(String deviceId, String name) {
-    return deviceFor(deviceId, name).connectionState.transform(
-          StreamTransformer.fromHandlers(
-            handleData: (data, sink) => sink.add(_connectionStateFrom(data)),
-          ),
-        );
-  }
-
-  @override
-  BluetoothDevice nativeFrom(
-          {required String deviceId, required String name}) =>
-      BluetoothDevice.fromProto(
-        BmBluetoothDevice(
-            localName: name, remoteId: deviceId, type: BmBluetoothSpecEnum.le),
-      );
-
-  @override
-  Future<List<BleDevice>> connectedDevices() async {
-    final devices = await FlutterBluePlus.connectedSystemDevices;
-    final result = <BleDevice>[];
-    for (final d in devices) {
-      result.add(await bleDeviceFor(d));
-    }
-    return result;
-  }
-
-  @override
-  FutureOr<bool> isConnected(String deviceId, String deviceName) async {
-    final connected = await connectedDevices();
-    _logger.fine("_ble.isConnected checking ${connected.length} devices");
-    return connected.any(
-      (e) => e.maybeMap((v) => v.deviceId == deviceId, orElse: () => false),
-    );
-  }
-
-  @override
-  Future<BleDevice> connectTo(String id, String name) async {
-    final native = deviceFor(id, name);
-    await native.connect();
-    return Future.value(bleDeviceFor(native));
-  }
-
-  @override
-  Future<void> disconnectFrom(String id, String name) async {
-    try {
-      final native = deviceFor(id, name);
-      native.disconnect();
-    } catch (e) {
-      return Future.error(BleDisconnectException(id, name, '', causedBy: e));
-    }
-  }
-
-  @override
-  Future<List<BleService>> servicesFor(String deviceId, String name) async {
-    final native = deviceFor(deviceId, name);
-
-    try {
-      final services = await servicesFrom(native);
-      final result = <BleService>[
-        for (final s in services) bleServiceFor(s, name),
-      ];
-
-      return Future.value(result);
-    } catch (e) {
-      return Future.error(BleServiceFetchException(deviceId, name,
-          causedBy: e, reason: 'Discovering services'));
-    }
-  }
-
-  @override
-  BleCharacteristic bleCharacteristicFor(
-      BluetoothCharacteristic c, String deviceName) {
-    final deviceId = c.remoteId.str;
-
-    return BleCharacteristic(
-      deviceId: deviceId,
-      deviceName: deviceName,
-      serviceUuid: BleUUID(c.serviceUuid.toString()),
-      characteristicUuid: BleUUID(c.characteristicUuid.toString()),
-      properties: BleCharacteristicProperties(
-        broadcast: c.properties.broadcast,
-        read: c.properties.read,
-        writeWithoutResponse: c.properties.writeWithoutResponse,
-        write: c.properties.write,
-        notify: c.properties.notify,
-        indicate: c.properties.indicate,
-        authenticatedSignedWrites: c.properties.authenticatedSignedWrites,
-        extendedProperties: c.properties.extendedProperties,
-        notifyEncryptionRequired: c.properties.notifyEncryptionRequired,
-        indicateEncryptionRequired: c.properties.indicateEncryptionRequired,
-      ),
-      descriptors: [
-        for (final d in c.descriptors) bleDescriptorFor(d, deviceName),
-      ],
-    );
-  }
-
-  @override
-  BleDescriptor bleDescriptorFor(BluetoothDescriptor d, String deviceName) {
-    final deviceId = d.remoteId.str;
-    return BleDescriptor(
-      deviceId: deviceId,
-      deviceName: deviceName,
-      serviceUuid: BleUUID(d.serviceUuid.toString()),
-      characteristicUuid: BleUUID(d.characteristicUuid.toString()),
-      descriptorUuid: BleUUID(d.descriptorUuid.toString()),
-    );
-  }
-
-  @override
-  BleService bleServiceFor(BluetoothService s, String deviceName) {
-    final deviceId = s.remoteId.str;
-    return BleService(
-      deviceId,
-      deviceName,
-      BleUUID(s.serviceUuid.toString()),
-      [for (final c in s.characteristics) bleCharacteristicFor(c, deviceName)],
-    );
-  }
-
-  /// Getting errors with multiple descriptor reads from different services
-  /// so use a Mutex to restrict access to a single call at a time.
-  /// Also seems to be a problem when mixing characteristic and descriptor
-  /// reads.
-  ///
-  /// TODO Find out if this is a bug or a "feature" of the underlying library
-  /// Some indications online are that only single operations are
-  /// possible so this might not be enough.
-  /// Maybe this should be per device like the insufficient mutex already
-  /// in the flutter_blue_plus underlying library.
-  final readDescriptorMutex = Mutex();
-
-  /// Get the values for a descriptor
-  Future<List<int>> readDescriptor({
-    required String deviceId,
-    required String name,
-    required BleUUID serviceUuid,
-    required BleUUID characteristicUuid,
-    required BleUUID descriptorUuid,
-  }) async {
-    // Only allow a single
-
-    _logger.fine('_ble: readDescriptor start $descriptorUuid');
-    final descriptor = await descriptorFor(
-        descriptorUuid, characteristicUuid, serviceUuid, deviceId, name);
-
-    try {
-      return await readDescriptorMutex.protect(() async {
-        _logger.fine('_ble: readDescriptor read start $descriptorUuid');
-        final values = await descriptor.read();
-        _logger.fine('_ble: readDescriptor done $descriptorUuid');
-        return Future.value(values);
-      });
-    } catch (e, t) {
-      // TODO !!!! Figure out if descriptor isn't there and have own exception
-      return Future.error(DescriptorException(
-          descriptorUuid: descriptorUuid,
-          characteristicUuid: characteristicUuid,
-          serviceUuid: serviceUuid,
-          deviceId: deviceId,
-          name: name,
-          causedBy: e,
-          reason: "Read descriptor"));
-    }
-  }
-
-  Future<List<int>> readCharacteristic({
-    required String deviceId,
-    required String deviceName,
-    required BleUUID serviceUuid,
-    required BleUUID characteristicUuid,
-  }) async {
-    try {
-      final characteristic = await characteristicFor(
-          characteristicUuid, serviceUuid, deviceId, deviceName);
-      return await readDescriptorMutex.protect(() async {
-        final values = await characteristic.read();
-        return Future.value(values);
-      });
-    } catch (e) {
-      return Future.error(CharacteristicException(
-        characteristicUuid: characteristicUuid,
-        serviceUuid: serviceUuid,
-        deviceId: deviceId,
-        deviceName: deviceName,
-        causedBy: e,
-        reason: "Read characteristic",
-      ));
-    }
-  }
-
-  Future<Stream<List<int>>> setNotifyCharacteristic({
-    required bool notify,
-    required String deviceId,
-    required String deviceName,
-    required BleUUID serviceUuid,
-    required BleUUID characteristicUuid,
-  }) async {
-    try {
-      final characteristic = await characteristicFor(
-          characteristicUuid, serviceUuid, deviceId, deviceName);
-      return await readDescriptorMutex.protect(() async {
-        final notification = await characteristic.setNotifyValue(notify);
-        if (notify && !notification) {
-          return Future.error(FailedToEnableNotification(
-            characteristicUuid: characteristicUuid,
-            serviceUuid: serviceUuid,
-            deviceId: deviceId,
-            deviceName: deviceName,
-          ));
-        }
-        return Future.value(characteristic.onValueReceived);
-      });
-    } catch (e) {
-      return Future.error(ReadingCharacteristicException(
-        characteristicUuid: characteristicUuid,
-        serviceUuid: serviceUuid,
-        deviceId: deviceId,
-        deviceName: deviceName,
-      ));
-    }
-  }
-
-  @override
-  BleUUID characteristicUuidFrom(
-          BluetoothCharacteristic nativeCharacteristic) =>
-      BleUUID(nativeCharacteristic.uuid.toString());
-
-  @override
-  List<BluetoothCharacteristic> characteristicsFrom(
-          BluetoothService nativeService) =>
-      nativeService.characteristics;
-
-  @override
-  BleUUID descriptorUuidFrom(BluetoothDescriptor nativeDescriptor) =>
-      BleUUID(nativeDescriptor.descriptorUuid.toString());
-
-  @override
-  List<BluetoothDescriptor> descriptorsFrom(
-      BluetoothCharacteristic nativeCharacteristic) {
-    return nativeCharacteristic.descriptors;
-  }
-
-  @override
-  BleUUID serviceUuidFrom(BluetoothService nativeService) =>
-      BleUUID(nativeService.uuid.toString());
-
-  @override
-  String exceptionDisplayMessage(Object o) {
-    final message = switch (o) {
-      FlutterBluePlusException blue => blue.description,
-      PlatformException platform => platform.message,
-      _ => null,
-    };
-
-    // If we didn't get anything fall back on [toString].
-    return message ?? o.toString();
-  }
-}
-
 /// Scanner for BLE devices.
 ///
 /// Notifies with [BleScanResult] object which can contain either a list of
@@ -467,7 +188,7 @@ class BleScanner extends _$BleScanner {
 
   @override
   BleScanResults build() {
-    _statusSubscription = FlutterBluePlus.isScanning.listen(
+    _statusSubscription = _ble.scannerStatusStream.listen(
       (event) {
         _logger.info("BleScanner: scanning=$event");
         _isScanning = event;
@@ -493,35 +214,21 @@ class BleScanner extends _$BleScanner {
     _logger.info("Start scanning...");
     stop();
 
-    _resultsSubscription = FlutterBluePlus.scanResults.listen((results) {
-      final scannedDevices = results.map((r) {
-        _ble.register(r.device);
-        return BleScannedDevice(
-            BleDevice.scanned(
-              deviceId: r.device.remoteId.str,
-              name: r.device.localName,
-              services: r.advertisementData.serviceUuids
-                  .map((e) => BleUUID(e))
-                  .toList(),
-            ),
-            r.rssi,
-            r.timeStamp,
-            r.device);
-      }).toList();
-      state = BleScanResults(scannedDevices);
+    _resultsSubscription = _ble.scannerResults.listen((results) {
+      state = BleScanResults(results);
     }, onDone: () {
       _logger.info("BleScanner: done");
     }, onError: (error) {
       _logger.severe("BleScanner: Error=$error");
     });
 
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 30));
+    _ble.startScan();
   }
 
   /// Stop scanning
   void stop() {
-    if (FlutterBluePlus.isScanningNow) {
-      FlutterBluePlus.stopScan();
+    if (_ble.isScanningNow) {
+      _ble.stopScan();
     }
 
     _resultsSubscription?.cancel();
