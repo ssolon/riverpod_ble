@@ -1,15 +1,46 @@
 import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../riverpod_ble.dart';
 import 'ble_flutter_blue_plus.dart';
+import 'ble_quick_blue.dart';
 import 'states/ble_scan_result.dart';
 
 part 'ble.g.dart';
 
 /// Riverpod access to Bluetooth LE
 
-final _ble = FlutterBluePlusBle();
+enum Backend {
+  flutterBluePlus,
+  quickBlue,
+}
+
+defaultLogRecord(LogRecord record) =>
+    // ignore: avoid_print
+    print(
+        "${record.time}: ${record.level.name}: ${record.loggerName} ${record.message}");
+
+void riverpodBleInit({
+  Backend backend = Backend.flutterBluePlus,
+  void Function(LogRecord) logRecord = defaultLogRecord,
+  Level rootLoggingLevel = Level.ALL,
+}) {
+  Logger.root.onRecord.listen(logRecord);
+  Logger.root.level = rootLoggingLevel;
+
+  switch (backend) {
+    case Backend.flutterBluePlus:
+      _ble = FlutterBluePlusBle();
+      break;
+
+    case Backend.quickBlue:
+      _ble = QuickBlueBle();
+      break;
+  }
+}
+
+late Ble _ble; // = FlutterBluePlusBle();
 
 final _logger = Logger("RiverpodBLE");
 
