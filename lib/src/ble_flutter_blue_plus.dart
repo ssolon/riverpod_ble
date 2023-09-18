@@ -222,6 +222,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   final readDescriptorMutex = Mutex();
 
   /// Get the values for a descriptor
+  @override
   Future<List<int>> readDescriptor({
     required String deviceId,
     required String name,
@@ -255,6 +256,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
     }
   }
 
+  @override
   Future<List<int>> readCharacteristic({
     required String deviceId,
     required String deviceName,
@@ -280,6 +282,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
     }
   }
 
+  @override
   Future<Stream<List<int>>> setNotifyCharacteristic({
     required bool notify,
     required String deviceId,
