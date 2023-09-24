@@ -10,11 +10,45 @@ import 'package:riverpod_ble/src/states/ble_scan_result.dart';
 import '../riverpod_ble.dart';
 
 class QuickBlueBle extends Ble {
+  /// Keep track of scanned devices since we get them one by one
   final _devicesSeen = HashSet<BleScannedDevice>(
     equals: (p0, p1) => p0.device == p1.device,
     hashCode: (p0) => p0.device.hashCode,
   );
+
+  /// Stream with scanner status messages
   final _scannerStatusStreamController = StreamController<bool>.broadcast();
+
+  /// Stream with connection status messages
+  final _connectionStatusStream = StreamController.broadcast();
+  final _connectedDevices = <String>{};
+
+  QuickBlueBle() {
+    QuickBlue.setConnectionHandler(_connectionHandler);
+  }
+
+  /// Handle a device connection status change
+  void _connectionHandler(String deviceId, BlueConnectionState state) {
+    final bleState = switch (state) {
+      BlueConnectionState.connected => _deviceConnected(deviceId),
+      BlueConnectionState.disconnected => _deviceDisconnected(deviceId),
+      _ => throw "Unknown BlueConnectionState=$state",
+    };
+
+    _connectionStatusStream.add(bleState);
+  }
+
+  /// Handle a deviceConnected callback
+  BleConnectionState _deviceConnected(String deviceId) {
+    _connectedDevices.add(deviceId);
+    return BleConnectionState.connected();
+  }
+
+  /// Handle a device disconnected callback
+  BleConnectionState _deviceDisconnected(String deviceId) {
+    _connectedDevices.remove(deviceId);
+    return BleConnectionState.disconnected();
+  }
 
   @override
   BleCharacteristic bleCharacteristicFor(
