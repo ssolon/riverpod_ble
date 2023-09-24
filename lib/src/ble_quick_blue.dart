@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:flutter/services.dart';
 import 'package:quick_blue/quick_blue.dart';
 import 'package:riverpod_ble/src/states/ble_scan_result.dart';
 
@@ -136,12 +137,6 @@ class QuickBlueBle extends Ble {
   }
 
   @override
-  String exceptionDisplayMessage(Object o) {
-    // TODO: implement exceptionDisplayMessage
-    throw UnimplementedError();
-  }
-
-  @override
   FutureOr<bool> isConnected(String deviceId, String deviceName) {
     // TODO: implement isConnected
     throw UnimplementedError();
@@ -207,5 +202,17 @@ class QuickBlueBle extends Ble {
       required BleUUID characteristicUuid}) {
     // TODO: implement setNotifyCharacteristic
     throw UnimplementedError();
+  }
+
+  @override
+  String exceptionDisplayMessage(Object o) {
+    final message = switch (o) {
+      // TODO Does quick_blue have exception base class?
+      PlatformException platform => platform.message,
+      _ => null,
+    };
+
+    // If we didn't get anything fall back on [toString].
+    return message ?? o.toString();
   }
 }
