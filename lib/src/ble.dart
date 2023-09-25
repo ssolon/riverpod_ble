@@ -544,7 +544,7 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
           },
           loading: () {},
         );
-      });
+      }, fireImmediately: true);
     } catch (e, t) {
       state = AsyncError(_fail(e), t);
     }
@@ -687,6 +687,7 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
             loading: () {},
           );
         },
+        fireImmediately: true,
       );
     } catch (e, t) {
       state = AsyncError(_fail(e), t);
