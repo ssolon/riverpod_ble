@@ -21,7 +21,7 @@ class BleUUID {
   /// Create from a [uuidString] which must be in standard UUID format
   /// or a hex string for a short uuid.
   factory BleUUID(String uuidString) {
-    final str = uuidString.toLowerCase();
+    final str = cleanUUIDString(uuidString);
 
     if (validateUUID(str)) {
       return BleUUID._(str);
@@ -70,6 +70,13 @@ class BleUUID {
   Map<String, dynamic> toJson() => {
         'str': str,
       };
+
+  static String cleanUUIDString(String uuidString) {
+    int start = uuidString.indexOf('{') + 1;
+    int end = uuidString.indexOf('}');
+
+    return uuidString.substring(start, end < 0 ? null : end).toLowerCase();
+  }
 
   /// Check [uuidstring] has a valid standard string format
   static bool validateUUID(String uuidString) {
