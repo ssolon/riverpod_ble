@@ -1,15 +1,20 @@
-/// Quick Blue version
-/*!!!!
 import 'dart:async';
 import 'dart:collection';
-
 import 'package:flutter/services.dart';
-import 'package:quick_blue/quick_blue.dart';
-import 'package:riverpod_ble/src/states/ble_scan_result.dart';
+import 'package:logging/logging.dart';
+import 'package:win_ble/win_ble.dart' as win;
+import 'package:win_ble/win_file.dart';
 
 import '../riverpod_ble.dart';
+import 'states/ble_scan_result.dart';
 
-class QuickBlueBle extends Ble {
+final logger = Logger("BleWinBle");
+
+class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
+    BleDescriptor> {
+  /// Native scan results
+  StreamSubscription<win.BleDevice>? scannerStream;
+
   /// Keep track of scanned devices since we get them one by one
   final _devicesSeen = HashSet<BleScannedDevice>(
     equals: (p0, p1) => p0.device == p1.device,
@@ -23,32 +28,62 @@ class QuickBlueBle extends Ble {
   final _connectionStatusStream = StreamController.broadcast();
   final _connectedDevices = <String>{};
 
-  QuickBlueBle() {
-    QuickBlue.setConnectionHandler(_connectionHandler);
+  final _scannerResultsStreamController =
+      StreamController<List<BleScannedDevice>>();
+
+  void initialize() async {
+    await win.WinBle.initialize(
+      serverPath: await WinServer.path,
+      enableLog: true,
+    );
   }
 
-  /// Handle a device connection status change
-  void _connectionHandler(String deviceId, BlueConnectionState state) {
-    final bleState = switch (state) {
-      BlueConnectionState.connected => _deviceConnected(deviceId),
-      BlueConnectionState.disconnected => _deviceDisconnected(deviceId),
-      _ => throw "Unknown BlueConnectionState=$state",
-    };
+  @override
+  void startScan({Duration timeout = const Duration(seconds: 30)}) {
+    _devicesSeen.clear();
 
-    _connectionStatusStream.add(bleState);
+    scannerStream = win.WinBle.scanStream.listen(
+      (event) {
+        logger.fine("ScannerStream event=${event.name}");
+        _devicesSeen.add(
+          BleScannedDevice(
+            BleDevice.scanned(
+              deviceId: event.address,
+              name: event.name,
+              services: event.serviceUuids.map((e) => BleUUID(e)).toList(),
+            ),
+            int.parse(event.rssi),
+            // TODO Parse string -> DateTime
+            DateTime.now(),
+            event,
+          ),
+        );
+        _scannerResultsStreamController
+            .add(_devicesSeen.toList(growable: false));
+      },
+    );
+
+    win.WinBle.startScanning();
+    _scannerStatusStreamController.add(true);
+    isScanningNow = true;
   }
 
-  /// Handle a deviceConnected callback
-  BleConnectionState _deviceConnected(String deviceId) {
-    _connectedDevices.add(deviceId);
-    return BleConnectionState.connected();
+  @override
+  void stopScan() {
+    win.WinBle.stopScanning();
+    _scannerStatusStreamController.add(false);
+    isScanningNow = false;
   }
 
-  /// Handle a device disconnected callback
-  BleConnectionState _deviceDisconnected(String deviceId) {
-    _connectedDevices.remove(deviceId);
-    return BleConnectionState.disconnected();
-  }
+  @override
+  Stream<bool> get scannerStatusStream => _scannerStatusStreamController.stream;
+
+  @override
+  bool isScanningNow = false;
+
+  @override
+  Stream<List<BleScannedDevice>> get scannerResults =>
+      _scannerResultsStreamController.stream;
 
   @override
   BleCharacteristic bleCharacteristicFor(
@@ -56,46 +91,6 @@ class QuickBlueBle extends Ble {
     // TODO: implement bleCharacteristicFor
     throw UnimplementedError();
   }
-
-  @override
-  bool isScanningNow = false;
-
-  @override
-  void startScan({Duration timeout = const Duration(seconds: 30)}) {
-    Future.delayed(timeout, () => stopScan());
-
-    _devicesSeen.clear();
-    QuickBlue.startScan();
-    isScanningNow = true;
-    _scannerStatusStreamController.add(true);
-  }
-
-  @override
-  void stopScan() {
-    QuickBlue.stopScan();
-    isScanningNow = false;
-    _scannerStatusStreamController.add(false);
-  }
-
-  @override
-  Stream<bool> get scannerStatusStream => _scannerStatusStreamController.stream;
-
-  @override
-  Stream<List<BleScannedDevice>> get scannerResults =>
-      QuickBlue.scanResultStream.map((r) {
-        _devicesSeen.add(
-          BleScannedDevice(
-              BleDevice.scanned(
-                deviceId: r.deviceId,
-                name: r.name,
-                services: [],
-              ),
-              r.rssi,
-              DateTime.now(),
-              r),
-        );
-        return _devicesSeen.toList(growable: false);
-      });
 
   @override
   BleDescriptor bleDescriptorFor(nativeDescriptor, String deviceName) {
@@ -116,7 +111,7 @@ class QuickBlueBle extends Ble {
   }
 
   @override
-  List characteristicsFrom(nativeService) {
+  List<win.BleCharacteristic> characteristicsFrom(nativeService) {
     // TODO: implement characteristicsFrom
     throw UnimplementedError();
   }
@@ -124,7 +119,7 @@ class QuickBlueBle extends Ble {
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName) {
     // TODO: implement connectTo
-    throw UnimplementedError();
+    throw UnimplementedError('connectTo is not implemented for Windows');
   }
 
   @override
@@ -153,7 +148,8 @@ class QuickBlueBle extends Ble {
   }
 
   @override
-  List descriptorsFrom(nativeCharacteristic) {
+  List<BleDescriptor> descriptorsFrom(
+      win.BleCharacteristic nativeCharacteristic) {
     // TODO: implement descriptorsFrom
     throw UnimplementedError();
   }
@@ -189,24 +185,6 @@ class QuickBlueBle extends Ble {
   }
 
   @override
-  BleUUID serviceUuidFrom(nativeService) {
-    // TODO: implement serviceUuidFrom
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<BleService>> servicesFor(String deviceId, String name) {
-    // TODO: implement servicesFor
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List> servicesFrom(native) {
-    // TODO: implement servicesFrom
-    throw UnimplementedError();
-  }
-
-  @override
   Future<List<int>> readCharacteristic(
       {required String deviceId,
       required String deviceName,
@@ -228,6 +206,24 @@ class QuickBlueBle extends Ble {
   }
 
   @override
+  BleUUID serviceUuidFrom(nativeService) {
+    // TODO: implement serviceUuidFrom
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<BleService>> servicesFor(String deviceId, String name) {
+    // TODO: implement servicesFor
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<BleService>> servicesFrom(win.BleDevice native) {
+    // TODO: implement servicesFrom
+    throw UnimplementedError();
+  }
+
+  @override
   Future<Stream<List<int>>> setNotifyCharacteristic(
       {required bool notify,
       required String deviceId,
@@ -241,7 +237,6 @@ class QuickBlueBle extends Ble {
   @override
   String exceptionDisplayMessage(Object o) {
     final message = switch (o) {
-      // TODO Does quick_blue have exception base class?
       PlatformException platform => platform.message,
       _ => null,
     };
@@ -250,4 +245,3 @@ class QuickBlueBle extends Ble {
     return message ?? o.toString();
   }
 }
-!!!!*/

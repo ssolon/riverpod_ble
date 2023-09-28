@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:riverpod_ble/src/ble_win_ble.dart';
 
 import '../riverpod_ble.dart';
 import 'ble_flutter_blue_plus.dart';
-import 'ble_quick_blue.dart';
+//import 'ble_quick_blue.dart';
 import 'states/ble_scan_result.dart';
 
 part 'ble.g.dart';
@@ -13,7 +14,7 @@ part 'ble.g.dart';
 
 enum Backend {
   flutterBluePlus,
-  quickBlue,
+  winBle,
 }
 
 defaultLogRecord(LogRecord record) =>
@@ -34,8 +35,8 @@ void riverpodBleInit({
       _ble = FlutterBluePlusBle();
       break;
 
-    case Backend.quickBlue:
-      _ble = QuickBlueBle();
+    case Backend.winBle:
+      _ble = BleWinBle()..initialize();
       break;
   }
 }
