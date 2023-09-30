@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_blue_plus: ^1.15.0
+  flutter_blue_plus: ^1.16.1
   flutter_riverpod: ^2.2.0
   freezed_annotation: ^2.4.1
   json_annotation: ^4.8.1
