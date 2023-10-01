@@ -41,7 +41,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
           return BleScannedDevice(
               BleDevice.scanned(
                 deviceId: r.device.remoteId.str,
-                name: r.device.localName,
+                name: r.device.platformName,
                 services: r.advertisementData.serviceUuids
                     .map((e) => BleUUID(e))
                     .toList(),
@@ -56,7 +56,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   String deviceIdOf(BluetoothDevice native) => native.remoteId.str;
 
   @override
-  String nameOf(BluetoothDevice native) => native.localName;
+  String nameOf(BluetoothDevice native) => native.platformName;
 
   @override
   Future<List<BluetoothService>> servicesFrom(BluetoothDevice native) async {
