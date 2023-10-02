@@ -104,9 +104,12 @@ abstract class Ble<T, S, C, D> {
   /// Get the service (if present) from a native device
   Future<List<S>> servicesFrom(T native);
 
+  /// Return the device for [deviceId] or [null]
+  T? maybeDeviceFor(String deviceId) => device(deviceId);
+
   /// Return the device for [deviceId] or create a new one
   T deviceFor(String deviceId, String name) {
-    return switch (device(deviceId)) {
+    return switch (maybeDeviceFor(deviceId)) {
       T d => d,
       _ => register(nativeFrom(deviceId: deviceId, name: name)),
     };
