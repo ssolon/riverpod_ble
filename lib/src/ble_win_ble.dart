@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:logging/logging.dart';
 import 'package:win_ble/win_ble.dart' as win;
 import 'package:win_ble/win_file.dart';
@@ -10,8 +11,34 @@ import 'states/ble_scan_result.dart';
 
 final logger = Logger("BleWinBle");
 
-class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
-    BleDescriptor> {
+/// Class to hold the state for a device since win_ble doesn't have a stateful
+/// object for it.
+class WinDevice {
+  final String deviceId;
+  final String deviceName;
+  late final _connectionStreamController =
+      StreamController<BleConnectionState>.broadcast();
+
+  BleConnectionState connectionState = BleConnectionState.unknownState();
+
+  WinDevice(this.deviceId, this.deviceName);
+
+  WinDevice.from(BluetoothDevice device)
+      : this(device.remoteId.str, device.platformName);
+
+  /// Connection stream for this device
+  Stream<BleConnectionState> get connectionStream =>
+      _connectionStreamController.stream;
+
+  /// Notification of [BleConnectionState]
+  void onConnectionStateChanged(BleConnectionState newState) {
+    connectionState = newState;
+    _connectionStreamController.add(newState);
+  }
+}
+
+class BleWinBle
+    extends Ble<WinDevice, BleService, win.BleCharacteristic, BleDescriptor> {
   /// Native scan results
   StreamSubscription<win.BleDevice>? scannerStream;
 
@@ -24,18 +51,32 @@ class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
   /// Stream with scanner status messages
   final _scannerStatusStreamController = StreamController<bool>.broadcast();
 
-  /// Stream with connection status messages
-  final _connectionStatusStream = StreamController.broadcast();
-  final _connectedDevices = <String>{};
-
+  /// Stream with scanned devices found
   final _scannerResultsStreamController =
       StreamController<List<BleScannedDevice>>();
+
+  /// Stream with connection status messages
+  late final _connectionStatusStreamSubscription;
 
   void initialize() async {
     await win.WinBle.initialize(
       serverPath: await WinServer.path,
       enableLog: true,
     );
+
+    // Listen for connection events
+    _connectionStatusStreamSubscription =
+        win.WinBle.connectionStream.listen((event) {
+      final deviceId = event["device"];
+      if (deviceId != null) {
+        final bleDevice = maybeDeviceFor(deviceId);
+        if (bleDevice != null) {
+          bleDevice.onConnectionStateChanged((event['connected'] as bool)
+              ? BleConnectionState.connected()
+              : BleConnectionState.disconnected());
+        }
+      }
+    });
   }
 
   @override
@@ -89,100 +130,117 @@ class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
   BleCharacteristic bleCharacteristicFor(
       nativeCharacteristic, String deviceName) {
     // TODO: implement bleCharacteristicFor
-    throw UnimplementedError();
+    throw UnimplementedError("bleCharacteristicFor");
   }
 
   @override
   BleDescriptor bleDescriptorFor(nativeDescriptor, String deviceName) {
     // TODO: implement bleDescriptorFor
-    throw UnimplementedError();
+    throw UnimplementedError("bleDescriptorFor");
   }
 
   @override
   BleService bleServiceFor(nativeService, String deviceName) {
     // TODO: implement bleServiceFor
-    throw UnimplementedError();
+    throw UnimplementedError("bleServiceFor");
   }
 
   @override
   BleUUID characteristicUuidFrom(nativeCharacteristic) {
     // TODO: implement characteristicUuidFrom
-    throw UnimplementedError();
+    throw UnimplementedError("setNotifyCharacteristic");
   }
 
   @override
   List<win.BleCharacteristic> characteristicsFrom(nativeService) {
     // TODO: implement characteristicsFrom
-    throw UnimplementedError();
+    throw UnimplementedError("characteristicUuidFrom");
   }
 
   @override
-  Future<BleDevice> connectTo(String deviceId, String deviceName) {
-    // TODO: implement connectTo
-    throw UnimplementedError('connectTo is not implemented for Windows');
+  Future<BleDevice> connectTo(String deviceId, String deviceName) async {
+    final completer = Completer<BleDevice>();
+
+    try {
+      final device = deviceFor(deviceId, deviceName);
+      StreamSubscription? connectionSubscription;
+
+      try {
+        connectionSubscription = device.connectionStream.listen(
+          (event) {
+            //TODO  What about re-connection and old stuff in the queue?
+            // For now just complete based on whatever comes in
+
+            // Stop listening since this is a one-shot
+            connectionSubscription?.cancel();
+
+            completer.complete(bleDeviceFor(device));
+          },
+        );
+      } catch (e, t) {
+        completer.completeError(e, t);
+      }
+
+      win.WinBle.connect(device.deviceId);
+
+      // Wait for the status to go through our connection stream
+    } catch (e, t) {
+      completer.completeError(e, t);
+    }
+
+    return completer.future;
   }
 
   @override
   Future<List<BleDevice>> connectedDevices() {
     // TODO: implement connectedDevices
-    throw UnimplementedError();
+    throw UnimplementedError("connectedDevices");
   }
 
   @override
   FutureOr<BleConnectionState> connectionStatusOf(native) {
-    // TODO: implement connectionStatusOf
-    throw UnimplementedError();
+    return native.connectionState;
   }
 
   @override
   Stream<BleConnectionState> connectionStreamFor(
-      String deviceId, String deviceName) {
-    // TODO: implement connectionStreamFor
-    throw UnimplementedError();
-  }
+          String deviceId, String deviceName) =>
+      deviceFor(deviceId, deviceName).connectionStream;
 
   @override
   BleUUID descriptorUuidFrom(nativeDescriptor) {
     // TODO: implement descriptorUuidFrom
-    throw UnimplementedError();
+    throw UnimplementedError("descriptorUuidFrom");
   }
 
   @override
   List<BleDescriptor> descriptorsFrom(
       win.BleCharacteristic nativeCharacteristic) {
     // TODO: implement descriptorsFrom
-    throw UnimplementedError();
+    throw UnimplementedError("descriptorsFrom");
   }
 
   @override
-  String deviceIdOf(native) {
-    // TODO: implement deviceIdOf
-    throw UnimplementedError();
-  }
+  String deviceIdOf(WinDevice native) => native.deviceId;
 
   @override
   Future<void> disconnectFrom(String deviceId, String deviceName) {
     // TODO: implement disconnectFrom
-    throw UnimplementedError();
+    throw UnimplementedError("disconnectFrom");
   }
 
   @override
   FutureOr<bool> isConnected(String deviceId, String deviceName) {
     // TODO: implement isConnected
-    throw UnimplementedError();
+    throw UnimplementedError("isConnected");
   }
 
   @override
-  String nameOf(native) {
-    // TODO: implement nameOf
-    throw UnimplementedError();
-  }
+  String nameOf(WinDevice native) => native.deviceName;
 
   @override
-  nativeFrom({required String deviceId, required String name}) {
-    // TODO: implement nativeFrom
-    throw UnimplementedError();
-  }
+  WinDevice nativeFrom({required String deviceId, required String name}) =>
+      WinDevice(deviceId, name);
 
   @override
   Future<List<int>> readCharacteristic(
@@ -191,7 +249,7 @@ class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid}) {
     // TODO: implement readCharacteristic
-    throw UnimplementedError();
+    throw UnimplementedError("readCharacteristic");
   }
 
   @override
@@ -202,25 +260,25 @@ class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
       required BleUUID characteristicUuid,
       required BleUUID descriptorUuid}) {
     // TODO: implement readDescriptor
-    throw UnimplementedError();
+    throw UnimplementedError("readDescriptor");
   }
 
   @override
   BleUUID serviceUuidFrom(nativeService) {
     // TODO: implement serviceUuidFrom
-    throw UnimplementedError();
+    throw UnimplementedError("serviceUuidFrom");
   }
 
   @override
   Future<List<BleService>> servicesFor(String deviceId, String name) {
     // TODO: implement servicesFor
-    throw UnimplementedError();
+    throw UnimplementedError("servicesFor");
   }
 
   @override
-  Future<List<BleService>> servicesFrom(win.BleDevice native) {
+  Future<List<BleService>> servicesFrom(WinDevice native) {
     // TODO: implement servicesFrom
-    throw UnimplementedError();
+    throw UnimplementedError("servicesFrom");
   }
 
   @override
@@ -231,7 +289,7 @@ class BleWinBle extends Ble<win.BleDevice, BleService, win.BleCharacteristic,
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid}) {
     // TODO: implement setNotifyCharacteristic
-    throw UnimplementedError();
+    throw UnimplementedError("setNotifyCharacteristic");
   }
 
   @override
