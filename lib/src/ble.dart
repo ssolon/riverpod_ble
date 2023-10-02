@@ -415,8 +415,15 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
     ref.listen(bleConnectionProvider(deviceId, deviceName), (previous, next) {
       next.when(
         data: (data) async {
-          // Connected -- listen to status stream for changes if we haven't
-          // already set this up
+          // Connected?
+
+          // Initialize to the connection state so we don't miss the first entry
+          data.maybeMap((value) {
+            state = AsyncData(value.status);
+          }, orElse: () {});
+
+          // Listen to status stream for changes if we haven't already set this
+          // up
 
           if (states == null) {
             states = _ble.connectionStreamFor(deviceId, deviceName);
