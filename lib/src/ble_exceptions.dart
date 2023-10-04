@@ -15,6 +15,9 @@ class RiverpodBleException with CausedBy implements Exception {
   @override
   final Object? causedBy;
 
+// TODO add optional stackTrace so we don't lose it
+  // final Object? stackTrace;
+
   const RiverpodBleException({this.causedBy});
 }
 

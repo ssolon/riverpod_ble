@@ -129,7 +129,7 @@ class BleWinBle
   @override
   BleCharacteristic bleCharacteristicFor(
       nativeCharacteristic, String deviceName) {
-    // TODO: implement bleCharacteristicFor
+    // Unused: we query the backend for the characteristic
     throw UnimplementedError("bleCharacteristicFor");
   }
 
@@ -193,8 +193,11 @@ class BleWinBle
 
   @override
   Future<List<BleDevice>> connectedDevices() {
-    // TODO: implement connectedDevices
-    throw UnimplementedError("connectedDevices");
+    final results = devices.values
+        .where((e) => connectionStatusOf(e) is Connected)
+        .map((d) async => await bleDeviceFor(d));
+
+    return Future.wait(results);
   }
 
   @override
@@ -223,16 +226,22 @@ class BleWinBle
   @override
   String deviceIdOf(WinDevice native) => native.deviceId;
 
+  /// It appears that WinBle will add a disconnect event to the stream
+  /// before the disconnect even finishes!
   @override
-  Future<void> disconnectFrom(String deviceId, String deviceName) {
-    // TODO: implement disconnectFrom
-    throw UnimplementedError("disconnectFrom");
+  Future<void> disconnectFrom(String deviceId, String deviceName) async {
+    try {
+      await win.WinBle.disconnect(deviceId);
+      // TODO Should we delete the WinDevice if it was disconnected?
+    } catch (e) {
+      throw BleDisconnectException(deviceId, deviceName, "", causedBy: e);
+    }
   }
 
   @override
   FutureOr<bool> isConnected(String deviceId, String deviceName) {
-    // TODO: implement isConnected
-    throw UnimplementedError("isConnected");
+    return maybeDeviceFor(deviceId)?.connectionState ==
+        BleConnectionState.connected();
   }
 
   @override
@@ -270,14 +279,18 @@ class BleWinBle
   }
 
   @override
-  Future<List<BleService>> servicesFor(String deviceId, String name) {
-    // TODO: implement servicesFor
-    throw UnimplementedError("servicesFor");
+  Future<List<BleService>> servicesFor(String deviceId, String name) async {
+    //TODO Store service information in WinDevice?
+    return Future.value((await win.WinBle.discoverServices(deviceId))
+        .map(
+          (e) => BleService(deviceId, name, BleUUID(e), []),
+        )
+        .toList());
   }
 
   @override
   Future<List<BleService>> servicesFrom(WinDevice native) {
-    // TODO: implement servicesFrom
+    // Unused: we query for services when needed
     throw UnimplementedError("servicesFrom");
   }
 
