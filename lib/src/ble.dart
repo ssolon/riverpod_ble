@@ -107,7 +107,7 @@ abstract class Ble<T, S, C, D> {
       String deviceId, String deviceName);
 
   /// Get the service (if present) from a native device
-  Future<List<S>> servicesFrom(T native);
+  Future<List<S>?> servicesFrom(T native);
 
   /// Return the device for [deviceId] or [null]
   T? maybeDeviceFor(String deviceId) => device(deviceId);
