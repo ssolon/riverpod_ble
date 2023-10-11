@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod_ble/src/ble_win_ble.dart';
@@ -28,12 +29,21 @@ defaultLogRecord(LogRecord record) =>
         "${logItem('stackTrace', record.stackTrace)}");
 
 void riverpodBleInit({
-  Backend backend = Backend.flutterBluePlus,
+  Backend? backend,
   void Function(LogRecord) logRecord = defaultLogRecord,
   Level rootLoggingLevel = Level.ALL,
 }) {
   Logger.root.onRecord.listen(logRecord);
   Logger.root.level = rootLoggingLevel;
+
+  backend ??= switch (defaultTargetPlatform) {
+    TargetPlatform.windows => Backend.winBle,
+    TargetPlatform.android ||
+    TargetPlatform.iOS ||
+    TargetPlatform.macOS =>
+      Backend.flutterBluePlus,
+    _ => throw Exception("Unsupported platform=$defaultTargetPlatform"),
+  };
 
   switch (backend) {
     case Backend.flutterBluePlus:
