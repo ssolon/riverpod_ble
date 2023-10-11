@@ -17,10 +17,15 @@ enum Backend {
   winBle,
 }
 
+logItem(n, o) => o == null ? "" : " $n={$o}";
+
 defaultLogRecord(LogRecord record) =>
     // ignore: avoid_print
-    print(
-        "${record.time}: ${record.level.name}: ${record.loggerName} ${record.message}");
+    print("${record.time}: ${record.level.name}:"
+        " ${record.loggerName}"
+        " ${record.message}"
+        "${logItem('error', record.error)}"
+        "${logItem('stackTrace', record.stackTrace)}");
 
 void riverpodBleInit({
   Backend backend = Backend.flutterBluePlus,
