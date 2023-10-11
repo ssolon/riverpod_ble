@@ -143,34 +143,42 @@ abstract class Ble<T, S, C, D> {
   BleService bleServiceFor(S nativeService, String deviceName);
   BleUUID serviceUuidFrom(S nativeService);
 
-  Future<S> serviceFor(
+  Future<WinBleService> serviceFor(
       BleUUID serviceUuid, String deviceId, String name) async {
     _logger.fine("serviceFor");
-    final nativeDevice = nativeFrom(deviceId: deviceId, name: name);
-    final services = await servicesFrom(nativeDevice);
-    final nativeService =
-        services.where((e) => serviceUuidFrom(e) == serviceUuid);
+    final services = await servicesFor(deviceId, name);
+    final nativeService = services.where((e) => e.serviceUuid == serviceUuid);
     if (nativeService.isEmpty) {
       throw UnknownService(serviceUuid, deviceId, name);
     }
 
-    return Future.value(nativeService.toList().first);
+    final service = nativeService.first;
+
+    return Future.value(WinBleService(deviceId, name, serviceUuid));
   }
 
-  List<C> characteristicsFrom(S nativeService);
+  //!!!!BleCharacteristic characteristicFrom(C nativeCharacteristic);
+
+  //!!!!List<C> characteristicsFrom(S nativeService);
+
+  Future<List<C>> characteristicsFor(
+      BleUUID serviceUuid, String deviceId, String name);
+
   BleUUID characteristicUuidFrom(C nativeCharacteristic);
+
   BleCharacteristic bleCharacteristicFor(
-      C nativeCharacteristic, String deviceName);
+      C nativeCharacteristic, String deviceName,
+      [BleUUID? serviceUuid, String? deviceId]);
 
   Future<C> characteristicFor(BleUUID characteristicUuid, BleUUID serviceUuid,
       String deviceId, String name) async {
     _logger.fine("characteristicFor");
-    final nativeService = serviceFor(serviceUuid, deviceId, name);
-    final characteristics = characteristicsFrom(await nativeService);
-    final nativeCharacteristic = characteristics.where(
+    final characteristics =
+        await characteristicsFor(serviceUuid, deviceId, name);
+    final characteristic = characteristics.where(
       (element) => characteristicUuidFrom(element) == characteristicUuid,
     );
-    if (nativeCharacteristic.isEmpty) {
+    if (characteristic.isEmpty) {
       throw UnknownCharacteristic(
           characteristicUuid: characteristicUuid,
           serviceUuid: serviceUuid,
@@ -178,7 +186,7 @@ abstract class Ble<T, S, C, D> {
           deviceName: name);
     }
 
-    return Future.value(nativeCharacteristic.first);
+    return Future.value(characteristic.first);
   }
 
   Future<List<int>> readCharacteristic({
@@ -514,6 +522,66 @@ class BleServicesFor extends _$BleServicesFor {
   void _fail(e, t) {
     state = AsyncError(
         BleServiceFetchException(deviceId, deviceName, causedBy: e), t);
+  }
+}
+
+/// Return the characteristics
+@riverpod
+class BleCharacteristicsFor extends _$BleCharacteristicsFor {
+  @override
+  Future<List<BleCharacteristic>> build(
+      {required BleUUID serviceUuid,
+      required String deviceId,
+      required String deviceName}) async {
+    final completer = Completer<List<BleCharacteristic>>();
+
+    try {
+      ref.listen(bleServicesForProvider(deviceId, deviceName),
+          (previous, next) {
+        next.when(
+          loading: () {},
+          data: (data) async {
+            _logger.finest("bleCharacteristicsFor: got services");
+            final service = data.where((s) => s.serviceUuid == serviceUuid);
+            if (service.isNotEmpty) {
+              try {
+                final nativeResults = await _ble.characteristicsFor(
+                    serviceUuid, deviceId, deviceName);
+                final results = nativeResults
+                    .map(
+                      (e) => _ble.bleCharacteristicFor(
+                          e, deviceName, serviceUuid, deviceName),
+                    )
+                    .toList();
+                _logger
+                    .finest("bleCharacteristicsForProvider: results=$results");
+                state = AsyncData(results);
+              } catch (e, t) {
+                _fail(e, t);
+              }
+            } else {
+              throw UnknownService(serviceUuid, deviceId, deviceName,
+                  reason: "Getting characteristics");
+            }
+          },
+          error: (error, stackTrace) => _fail(error, stackTrace),
+        );
+      }, fireImmediately: true);
+    } catch (e, t) {
+      _fail(e, t);
+    }
+
+    return completer.future;
+  }
+
+  _fail(e, t) {
+    state = AsyncError(
+        CharacteristicsDiscoverException(
+            deviceId: deviceId,
+            deviceName: deviceName,
+            serviceUuid: serviceUuid,
+            causedBy: e),
+        t);
   }
 }
 

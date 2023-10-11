@@ -154,8 +154,20 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
+  Future<List<BluetoothCharacteristic>> characteristicsFor(
+      BleUUID serviceUuid, String deviceId, String name) async {
+    final device = deviceFor(deviceId, name);
+    final service = device.servicesList
+        ?.where((e) => BleUUID(e.serviceUuid.toString()) == serviceUuid);
+    return Future.value(service != null && service.isNotEmpty
+        ? service.first.characteristics
+        : <BluetoothCharacteristic>[]);
+  }
+
+  @override
   BleCharacteristic bleCharacteristicFor(
-      BluetoothCharacteristic nativeCharacteristic, String deviceName) {
+      BluetoothCharacteristic nativeCharacteristic, String deviceName,
+      [BleUUID? serviceUuid, String? deviceId]) {
     final c = nativeCharacteristic;
     final deviceId = c.remoteId.str;
 

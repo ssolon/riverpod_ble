@@ -105,6 +105,34 @@ class UnknownService extends RiverpodBleException with BleDeviceInfo {
 }
 
 @immutable
+class CharacteristicsDiscoverException extends RiverpodBleException
+    with BleDeviceInfo {
+  final BleUUID serviceUuid;
+  @override
+  final String deviceId;
+  @override
+  final String deviceName;
+  final String? reason;
+
+  const CharacteristicsDiscoverException({
+    required this.serviceUuid,
+    required this.deviceId,
+    required this.deviceName,
+    this.reason,
+    super.causedBy,
+  });
+
+  @override
+  String toString() => exceptionMessage("CharacteristicsDiscoverException", [
+        (n: 'deviceName', v: deviceName),
+        (n: 'deviceId', v: deviceId),
+        (n: 'serviceUuid', v: serviceUuid),
+      ], [
+        (n: 'reason', v: reason ?? ''),
+      ]);
+}
+
+@immutable
 class CharacteristicException extends RiverpodBleException with BleDeviceInfo {
   final BleUUID characteristicUuid;
   final BleUUID serviceUuid;

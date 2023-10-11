@@ -16,6 +16,8 @@ final logger = Logger("BleWinBle");
 class WinDevice {
   final String deviceId;
   final String deviceName;
+  List<WinBleService>? services;
+
   late final _connectionStreamController =
       StreamController<BleConnectionState>.broadcast();
 
@@ -37,8 +39,36 @@ class WinDevice {
   }
 }
 
+// Our "native" service since there really isn't one in the backend
+class WinBleService {
+  final String deviceId;
+  final String deviceName;
+  final BleUUID serviceUuid;
+  List<WinBleCharacteristic>? characteristics;
+
+  WinBleService(this.deviceId, this.deviceName, this.serviceUuid,
+      [this.characteristics]);
+}
+
+/// Our "native" characteristic since the real one lacks some stuff we want
+class WinBleCharacteristic {
+  final String deviceId;
+  final String deviceName;
+  final BleUUID serviceUuid;
+  final BleUUID characteristicUuid;
+  final BleCharacteristicProperties properties;
+
+  WinBleCharacteristic({
+    required this.deviceId,
+    required this.deviceName,
+    required this.serviceUuid,
+    required this.characteristicUuid,
+    required this.properties,
+  });
+}
+
 class BleWinBle
-    extends Ble<WinDevice, BleService, win.BleCharacteristic, BleDescriptor> {
+    extends Ble<WinDevice, WinBleService, WinBleCharacteristic, BleDescriptor> {
   /// Native scan results
   StreamSubscription<win.BleDevice>? scannerStream;
 
@@ -128,9 +158,35 @@ class BleWinBle
 
   @override
   BleCharacteristic bleCharacteristicFor(
-      nativeCharacteristic, String deviceName) {
-    // Unused: we query the backend for the characteristic
-    throw UnimplementedError("bleCharacteristicFor");
+      nativeCharacteristic, String deviceName,
+      [BleUUID? serviceUuid, String? deviceId]) {
+    assert(serviceUuid != null);
+    assert(deviceId != null);
+
+    final props = nativeCharacteristic.properties;
+
+    return BleCharacteristic(
+      deviceId: deviceId!,
+      deviceName: deviceName,
+      serviceUuid: serviceUuid!,
+      characteristicUuid: characteristicUuidFrom(nativeCharacteristic),
+      properties: BleCharacteristicProperties(
+        broadcast: props.broadcast,
+        read: props.read,
+        writeWithoutResponse: props.writeWithoutResponse,
+        write: props.write,
+        notify: props.notify,
+        indicate: props.indicate,
+        authenticatedSignedWrites: props.authenticatedSignedWrites,
+        extendedProperties: false,
+        notifyEncryptionRequired: false,
+        indicateEncryptionRequired: false,
+        // TODO Support these?
+        // reliableWrite: c.reliableWrite,
+        // writableAuxiliaries: c.writableAuxiliaries,
+      ),
+      descriptors: [],
+    );
   }
 
   @override
@@ -146,15 +202,57 @@ class BleWinBle
   }
 
   @override
-  BleUUID characteristicUuidFrom(nativeCharacteristic) {
-    // TODO: implement characteristicUuidFrom
-    throw UnimplementedError("setNotifyCharacteristic");
+  BleUUID characteristicUuidFrom(nativeCharacteristic) =>
+      nativeCharacteristic.characteristicUuid;
+
+  @override
+  Future<List<WinBleCharacteristic>> characteristicsFor(
+      BleUUID serviceUuid, String deviceId, String name) async {
+    final service = await serviceFor(serviceUuid, deviceId, name);
+
+    if (service.characteristics == null) {
+      final nativeCharacteristics = await win.WinBle.discoverCharacteristics(
+          address: deviceId, serviceId: serviceUuid.str);
+
+      logger.finest(
+          "characteristicsFor: service=$serviceUuid results=${nativeCharacteristics.length}");
+
+      service.characteristics = nativeCharacteristics
+          .map((c) => WinBleCharacteristic(
+                deviceId: deviceId,
+                deviceName: name,
+                serviceUuid: serviceUuid,
+                characteristicUuid: BleUUID(c.uuid),
+                properties: BleCharacteristicProperties(
+                  broadcast: c.properties.broadcast ?? false,
+                  read: c.properties.read ?? false,
+                  writeWithoutResponse:
+                      c.properties.writeWithoutResponse ?? false,
+                  write: c.properties.write ?? false,
+                  notify: c.properties.notify ?? false,
+                  indicate: c.properties.indicate ?? false,
+                  authenticatedSignedWrites:
+                      c.properties.authenticatedSignedWrites ?? false,
+                  extendedProperties: false,
+                  notifyEncryptionRequired: false,
+                  indicateEncryptionRequired: false,
+                  // TODO Support these?
+                  // reliableWrite: c.reliableWrite,
+                  // writableAuxiliaries: c.writableAuxiliaries,
+                ),
+              ))
+          .toList();
+
+      logger.finest("characteristicsFor: added");
+    }
+
+    return Future.value(service.characteristics);
   }
 
   @override
-  List<win.BleCharacteristic> characteristicsFrom(nativeService) {
+  List<BleCharacteristic> characteristicsFrom(WinBleService nativeService) {
     // TODO: implement characteristicsFrom
-    throw UnimplementedError("characteristicUuidFrom");
+    throw UnimplementedError("characteristicsFrom");
   }
 
   @override
@@ -218,7 +316,7 @@ class BleWinBle
 
   @override
   List<BleDescriptor> descriptorsFrom(
-      win.BleCharacteristic nativeCharacteristic) {
+      WinBleCharacteristic nativeCharacteristic) {
     // TODO: implement descriptorsFrom
     throw UnimplementedError("descriptorsFrom");
   }
@@ -233,6 +331,7 @@ class BleWinBle
     try {
       await win.WinBle.disconnect(deviceId);
       // TODO Should we delete the WinDevice if it was disconnected?
+      // TODO Might be a good idea now that we store servie
     } catch (e) {
       throw BleDisconnectException(deviceId, deviceName, "", causedBy: e);
     }
@@ -280,16 +379,28 @@ class BleWinBle
 
   @override
   Future<List<BleService>> servicesFor(String deviceId, String name) async {
-    //TODO Store service information in WinDevice?
-    return Future.value((await win.WinBle.discoverServices(deviceId))
+    final device = deviceFor(deviceId, name);
+
+    device.services ??= (await win.WinBle.discoverServices(deviceId))
         .map(
-          (e) => BleService(deviceId, name, BleUUID(e), []),
+          (e) => WinBleService(deviceId, name, BleUUID(e), []),
         )
+        .toList();
+
+    return Future.value(device.services
+        ?.map((s) => BleService(
+              s.deviceId,
+              s.deviceName,
+              s.serviceUuid,
+              (s.characteristics ?? [])
+                  .map((e) => bleCharacteristicFor(e, name))
+                  .toList(),
+            ))
         .toList());
   }
 
   @override
-  Future<List<BleService>> servicesFrom(WinDevice native) {
+  Future<List<WinBleService>> servicesFrom(WinDevice native) {
     // Unused: we query for services when needed
     throw UnimplementedError("servicesFrom");
   }
