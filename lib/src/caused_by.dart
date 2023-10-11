@@ -2,6 +2,8 @@
 typedef MsgVarDef = ({String n, Object? v});
 typedef MsgVarList = List<MsgVarDef>;
 
+// TODO Add optional stackTrace since we lose it when throwing new exception
+
 /// Mixin to augment classes with a reference to another object. Used by
 /// [Exception] subclasses to create a chain of references of exceptions that
 /// can be search to determine a source of exceptions to simplify error handling
