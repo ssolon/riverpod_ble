@@ -20,6 +20,17 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
+  Future<void> initialize() {
+    // TODO something here -- maybe check if Bluetooth available?
+    return Future.value();
+  }
+
+  @override
+  Future<void> dispose() {
+    return Future.value();
+  }
+
+  @override
   void startScan({Duration timeout = const Duration(seconds: 30)}) {
     FlutterBluePlus.startScan(timeout: timeout);
   }
@@ -59,11 +70,17 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   String nameOf(BluetoothDevice native) => native.platformName;
 
   @override
-  Future<List<BluetoothService>> servicesFrom(BluetoothDevice native) async {
-    _logger.fine("servicesFrom");
-    // return Future.value((await device.servicesStream.toList()).first);
+  Future<List<BluetoothService>> servicesFrom(BluetoothDevice device) async {
+    return device.servicesList ?? await device.discoverServices();
+  }
 
-    final services = native.servicesList ?? await native.discoverServices();
+  @override
+  Future<List<BluetoothService>> servicesFor(
+      String deviceId, String name) async {
+    _logger.fine("servicesFor");
+
+    final device = deviceFor(deviceId, name);
+    final services = servicesFrom(device);
 
     return Future.value(services);
   }
@@ -137,13 +154,11 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  Future<List<BleService>> servicesFor(String deviceId, String name) async {
-    final native = deviceFor(deviceId, name);
-
+  Future<List<BleService>> bleServicesFor(String deviceId, String name) async {
     try {
-      final services = await servicesFrom(native);
+      final services = await servicesFor(deviceId, name);
       final result = <BleService>[
-        for (final s in services) bleServiceFor(s, name),
+        for (final s in services) bleServiceFrom(s, name),
       ];
 
       return Future.value(result);
@@ -165,9 +180,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleCharacteristic bleCharacteristicFor(
-      BluetoothCharacteristic nativeCharacteristic, String deviceName,
-      [BleUUID? serviceUuid, String? deviceId]) {
+  BleCharacteristic bleCharacteristicFrom(
+      BluetoothCharacteristic nativeCharacteristic, String deviceName) {
     final c = nativeCharacteristic;
     final deviceId = c.remoteId.str;
 
@@ -209,14 +223,14 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleService bleServiceFor(BluetoothService nativeService, String deviceName) {
+  BleService bleServiceFrom(BluetoothService nativeService, String deviceName) {
     final s = nativeService;
     final deviceId = s.remoteId.str;
     return BleService(
       deviceId,
       deviceName,
       BleUUID(s.serviceUuid.toString()),
-      [for (final c in s.characteristics) bleCharacteristicFor(c, deviceName)],
+      [for (final c in s.characteristics) bleCharacteristicFrom(c, deviceName)],
     );
   }
 
@@ -331,10 +345,10 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
           BluetoothCharacteristic nativeCharacteristic) =>
       BleUUID(nativeCharacteristic.uuid.toString());
 
-  @override
-  List<BluetoothCharacteristic> characteristicsFrom(
-          BluetoothService nativeService) =>
-      nativeService.characteristics;
+  //!!!! @override
+  // List<BluetoothCharacteristic> characteristicsFrom(
+  // BluetoothService nativeService) =>
+  // nativeService.characteristics;
 
   @override
   BleUUID descriptorUuidFrom(BluetoothDescriptor nativeDescriptor) =>

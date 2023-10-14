@@ -88,7 +88,8 @@ class BleWinBle
   /// Stream with connection status messages
   late final _connectionStatusStreamSubscription;
 
-  void initialize() async {
+  @override
+  Future<void> initialize() async {
     await win.WinBle.initialize(
       serverPath: await WinServer.path,
       enableLog: true,
@@ -107,6 +108,12 @@ class BleWinBle
         }
       }
     });
+  }
+
+  @override
+  Future<void> dispose() {
+    win.WinBle.dispose();
+    return Future.value();
   }
 
   @override
@@ -157,18 +164,13 @@ class BleWinBle
       _scannerResultsStreamController.stream;
 
   @override
-  BleCharacteristic bleCharacteristicFor(
-      nativeCharacteristic, String deviceName,
-      [BleUUID? serviceUuid, String? deviceId]) {
-    assert(serviceUuid != null);
-    assert(deviceId != null);
-
+  BleCharacteristic bleCharacteristicFrom(nativeCharacteristic, deviceName) {
     final props = nativeCharacteristic.properties;
 
     return BleCharacteristic(
-      deviceId: deviceId!,
-      deviceName: deviceName,
-      serviceUuid: serviceUuid!,
+      deviceId: nativeCharacteristic.deviceId,
+      deviceName: nativeCharacteristic.deviceName,
+      serviceUuid: nativeCharacteristic.serviceUuid,
       characteristicUuid: characteristicUuidFrom(nativeCharacteristic),
       properties: BleCharacteristicProperties(
         broadcast: props.broadcast,
@@ -195,11 +197,20 @@ class BleWinBle
     throw UnimplementedError("bleDescriptorFor");
   }
 
-  @override
-  BleService bleServiceFor(nativeService, String deviceName) {
-    // TODO: implement bleServiceFor
-    throw UnimplementedError("bleServiceFor");
+  List<BleCharacteristic> bleCharacteristicsFrom(WinBleService nativeService) {
+    return List<BleCharacteristic>.from(nativeService.characteristics
+            ?.map((e) => bleCharacteristicFrom(e, e.deviceName)) ??
+        <BleCharacteristic>[]);
   }
+
+  @override
+  BleService bleServiceFrom(WinBleService nativeService, String deviceName) =>
+      BleService(
+        nativeService.deviceId,
+        nativeService.deviceName,
+        nativeService.serviceUuid,
+        bleCharacteristicsFrom(nativeService),
+      );
 
   @override
   BleUUID characteristicUuidFrom(nativeCharacteristic) =>
@@ -247,12 +258,6 @@ class BleWinBle
     }
 
     return Future.value(service.characteristics);
-  }
-
-  @override
-  List<BleCharacteristic> characteristicsFrom(WinBleService nativeService) {
-    // TODO: implement characteristicsFrom
-    throw UnimplementedError("characteristicsFrom");
   }
 
   @override
@@ -372,31 +377,34 @@ class BleWinBle
   }
 
   @override
-  BleUUID serviceUuidFrom(nativeService) {
-    // TODO: implement serviceUuidFrom
-    throw UnimplementedError("serviceUuidFrom");
-  }
+  BleUUID serviceUuidFrom(nativeService) => nativeService.serviceUuid;
 
   @override
-  Future<List<BleService>> servicesFor(String deviceId, String name) async {
+  Future<List<WinBleService>> servicesFor(String deviceId, String name) async {
     final device = deviceFor(deviceId, name);
 
     device.services ??= (await win.WinBle.discoverServices(deviceId))
         .map(
-          (e) => WinBleService(deviceId, name, BleUUID(e), []),
+          (e) => WinBleService(deviceId, name, BleUUID(e)),
         )
         .toList();
 
-    return Future.value(device.services
-        ?.map((s) => BleService(
+    return Future.value(device.services);
+  }
+
+  @override
+  Future<List<BleService>> bleServicesFor(String deviceId, String name) async {
+    final nativeServices = await servicesFor(deviceId, name);
+    return nativeServices
+        .map((s) => BleService(
               s.deviceId,
               s.deviceName,
               s.serviceUuid,
               (s.characteristics ?? [])
-                  .map((e) => bleCharacteristicFor(e, name))
+                  .map((e) => bleCharacteristicFrom(e, name))
                   .toList(),
             ))
-        .toList());
+        .toList();
   }
 
   @override

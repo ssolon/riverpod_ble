@@ -32,7 +32,7 @@ void riverpodBleInit({
   Backend? backend,
   void Function(LogRecord) logRecord = defaultLogRecord,
   Level rootLoggingLevel = Level.ALL,
-}) {
+}) async {
   Logger.root.onRecord.listen(logRecord);
   Logger.root.level = rootLoggingLevel;
 
@@ -51,7 +51,8 @@ void riverpodBleInit({
       break;
 
     case Backend.winBle:
-      _ble = BleWinBle()..initialize();
+      _ble = BleWinBle();
+      await _ble.initialize();
       break;
   }
 }
@@ -69,6 +70,12 @@ final _logger = Logger("RiverpodBLE");
 ///   C = native characteristic type
 ///   D = native descriptor type
 abstract class Ble<T, S, C, D> {
+  /// Call before doing anything else
+  Future<void> initialize();
+
+  /// Call when you're done
+  Future<void> dispose();
+
   /// Scanner
 
   /// Stream of scanner status (true = scanning)
@@ -144,30 +151,34 @@ abstract class Ble<T, S, C, D> {
   /// Connect to a device [deviceId]
   Future<BleDevice> connectTo(String deviceId, String deviceName);
 
+  /// Return the native services for [deviceId]
+  Future<List<S>> servicesFor(String deviceId, String name);
+
   /// Return the services for [deviceId]
-  Future<List<BleService>> servicesFor(String deviceId, String name);
+  Future<List<BleService>> bleServicesFor(String deviceId, String name);
 
   /// Disconnect from device
   Future<void> disconnectFrom(String deviceId, String deviceName);
 
-  BleService bleServiceFor(S nativeService, String deviceName);
+  BleService bleServiceFrom(S nativeService, String deviceName);
   BleUUID serviceUuidFrom(S nativeService);
 
-  Future<WinBleService> serviceFor(
+  Future<S> serviceFor(
       BleUUID serviceUuid, String deviceId, String name) async {
     _logger.fine("serviceFor");
     final services = await servicesFor(deviceId, name);
-    final nativeService = services.where((e) => e.serviceUuid == serviceUuid);
+    final nativeService =
+        services.where((e) => serviceUuidFrom(e) == serviceUuid);
     if (nativeService.isEmpty) {
       throw UnknownService(serviceUuid, deviceId, name);
     }
 
     final service = nativeService.first;
 
-    return Future.value(WinBleService(deviceId, name, serviceUuid));
+    return Future.value(service);
   }
 
-  //!!!!BleCharacteristic characteristicFrom(C nativeCharacteristic);
+  // BleCharacteristic bleCharacteristicFrom(C nativeCharacteristic);
 
   //!!!!List<C> characteristicsFrom(S nativeService);
 
@@ -176,9 +187,11 @@ abstract class Ble<T, S, C, D> {
 
   BleUUID characteristicUuidFrom(C nativeCharacteristic);
 
-  BleCharacteristic bleCharacteristicFor(
-      C nativeCharacteristic, String deviceName,
-      [BleUUID? serviceUuid, String? deviceId]);
+  BleCharacteristic bleCharacteristicFrom(
+    C nativeCharacteristic,
+    String deviceName,
+    // [BleUUID? serviceUuid, String? deviceId]);
+  );
 
   Future<C> characteristicFor(BleUUID characteristicUuid, BleUUID serviceUuid,
       String deviceId, String name) async {
@@ -369,6 +382,12 @@ class BleConnectedDevices extends _$BleConnectedDevices {
   }
 }
 
+/// Initialization to synchronized everything else until backend is ready
+// @riverpod
+// Future<void> initialization(InitializationRef ref) async {
+// return _ble.initialize();
+// }
+
 /// Creates and handle a connection
 @riverpod
 class BleConnection extends _$BleConnection {
@@ -491,7 +510,7 @@ class BleServicesFor extends _$BleServicesFor {
 
           // Connected, discover services
           try {
-            final result = await _ble.servicesFor(deviceId, deviceName);
+            final result = await _ble.bleServicesFor(deviceId, deviceName);
             _logger.finest('bleServicesFor: got services');
             state = AsyncData(result);
           } catch (e, stack) {
@@ -551,7 +570,7 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
         next.when(
           loading: () {},
           data: (data) async {
-            _logger.finest("bleCharacteristicsFor: got services");
+            _logger.finest("bleCharacteristicsForProvider: got services");
             final service = data.where((s) => s.serviceUuid == serviceUuid);
             if (service.isNotEmpty) {
               try {
@@ -559,8 +578,7 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
                     serviceUuid, deviceId, deviceName);
                 final results = nativeResults
                     .map(
-                      (e) => _ble.bleCharacteristicFor(
-                          e, deviceName, serviceUuid, deviceId),
+                      (e) => _ble.bleCharacteristicFrom(e, deviceName),
                     )
                     .toList();
                 _logger
@@ -627,7 +645,7 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
                   deviceId,
                   deviceName,
                 );
-                state = AsyncData(_ble.bleCharacteristicFor(c, deviceName));
+                state = AsyncData(_ble.bleCharacteristicFrom(c, deviceName));
               } catch (e, t) {
                 state = AsyncError(_fail(e), t);
               }
