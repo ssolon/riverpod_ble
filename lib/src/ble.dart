@@ -560,7 +560,7 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
                 final results = nativeResults
                     .map(
                       (e) => _ble.bleCharacteristicFor(
-                          e, deviceName, serviceUuid, deviceName),
+                          e, deviceName, serviceUuid, deviceId),
                     )
                     .toList();
                 _logger
