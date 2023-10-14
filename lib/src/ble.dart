@@ -178,10 +178,6 @@ abstract class Ble<T, S, C, D> {
     return Future.value(service);
   }
 
-  // BleCharacteristic bleCharacteristicFrom(C nativeCharacteristic);
-
-  //!!!!List<C> characteristicsFrom(S nativeService);
-
   Future<List<C>> characteristicsFor(
       BleUUID serviceUuid, String deviceId, String name);
 

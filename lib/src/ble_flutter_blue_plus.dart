@@ -345,11 +345,6 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
           BluetoothCharacteristic nativeCharacteristic) =>
       BleUUID(nativeCharacteristic.uuid.toString());
 
-  //!!!! @override
-  // List<BluetoothCharacteristic> characteristicsFrom(
-  // BluetoothService nativeService) =>
-  // nativeService.characteristics;
-
   @override
   BleUUID descriptorUuidFrom(BluetoothDescriptor nativeDescriptor) =>
       BleUUID(nativeDescriptor.descriptorUuid.toString());
