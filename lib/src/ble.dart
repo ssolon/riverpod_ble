@@ -18,6 +18,19 @@ enum Backend {
   winBle,
 }
 
+/// States that Bluetooth controller can be in
+enum BleBluetoothState {
+  on,
+  off,
+  unknown,
+  disabled,
+  unsupported,
+}
+
+/// Stream with bluetooth adapter state information
+final bluetoothAdapterStateStreamController =
+    StreamController<BleBluetoothState>.broadcast();
+
 logItem(n, o) => o == null ? "" : " $n={$o}";
 
 defaultLogRecord(LogRecord record) =>
@@ -52,7 +65,8 @@ void riverpodBleInit({
 
     case Backend.winBle:
       _ble = BleWinBle();
-      await _ble.initialize();
+      // initialize should by called by initializationProvider
+      // await _ble.initialize();
       break;
   }
 }
@@ -278,14 +292,35 @@ class BleScanner extends _$BleScanner {
 
   @override
   BleScanResults build() {
-    _statusSubscription = _ble.scannerStatusStream.listen(
-      (event) {
-        _logger.info("BleScanner: scanning=$event");
-        _isScanning = event;
-        state = _isScanning
-            ? BleScanResults.scanStarted()
-            : BleScanResults.scanDone();
+    ref.listen(
+      initializationProvider,
+      (previous, next) {
+        logger.fine("BleScanner.build next=$next");
+        next.maybeWhen(
+          data: (data) {
+            _statusSubscription = _ble.scannerStatusStream.listen(
+              (event) {
+                _logger.info("BleScanner: scanning=$event");
+                _isScanning = event;
+                state = _isScanning
+                    ? BleScanResults.scanStarted()
+                    : BleScanResults.scanDone();
+              },
+            );
+
+            // TODO Handle bluetooth state changes/errors
+            if (data == BleBluetoothState.on) {
+              start();
+            }
+          },
+          error: (error, stackTrace) {
+            throw BleInitializationError(
+                reason: "Scanner initialization", causedBy: error);
+          },
+          orElse: () {},
+        );
       },
+      fireImmediately: true,
     );
 
     // Cleanup
@@ -294,7 +329,7 @@ class BleScanner extends _$BleScanner {
       _statusSubscription?.cancel();
     });
 
-    start();
+    // start(); moved above
 
     return BleScanResults.initial();
   }
@@ -317,6 +352,7 @@ class BleScanner extends _$BleScanner {
 
   /// Stop scanning
   void stop() {
+    _logger.info("Stop scanning");
     if (_ble.isScanningNow) {
       _ble.stopScan();
     }
@@ -378,11 +414,33 @@ class BleConnectedDevices extends _$BleConnectedDevices {
   }
 }
 
-/// Initialization to synchronized everything else until backend is ready
-// @riverpod
-// Future<void> initialization(InitializationRef ref) async {
-// return _ble.initialize();
-// }
+/// Initialization to synchronize everything else until backend is ready
+@Riverpod(keepAlive: true)
+class Initialization extends _$Initialization {
+  final _completer = Completer<BleBluetoothState>();
+  late final StreamSubscription _bluetoothStateSubscription;
+
+  @override
+  FutureOr<BleBluetoothState> build() async {
+    logger.info("BleInitialize");
+
+    _bluetoothStateSubscription =
+        bluetoothAdapterStateStreamController.stream.listen(
+      (event) {
+        logger.fine("BleBluetoothState=$event");
+        state = AsyncData(event);
+      },
+    );
+
+    ref.onDispose(() {
+      _bluetoothStateSubscription.cancel();
+    });
+
+    _ble.initialize();
+
+    return _completer.future;
+  }
+}
 
 /// Creates and handle a connection
 @riverpod
@@ -390,6 +448,7 @@ class BleConnection extends _$BleConnection {
   @override
   Future<BleDevice> build(String deviceId, String deviceName) async {
     _logger.fine('BleConnection: build');
+
     ref.onDispose(() {
       _logger.fine("BleConnection: dispose");
       disconnect();
@@ -409,6 +468,23 @@ class BleConnection extends _$BleConnection {
       _logger.fine('BleConnection: resume');
     });
     //!!!! Debugging
+
+    ref.listen(
+      initializationProvider,
+      (previous, next) async {
+        next.when(
+          data: (data) async {
+            // TODO Handle state change
+            if (data == BleBluetoothState.on) {
+              state = AsyncData(await connect());
+            }
+          },
+          error: (error, stackTrace) => throw ("BluetoothError: $error"),
+          loading: () {},
+        );
+      },
+      fireImmediately: true,
+    );
 
     state = const AsyncValue<BleDevice>.loading();
 

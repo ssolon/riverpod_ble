@@ -83,16 +83,29 @@ class BleWinBle
 
   /// Stream with scanned devices found
   final _scannerResultsStreamController =
-      StreamController<List<BleScannedDevice>>();
+      StreamController<List<BleScannedDevice>>.broadcast();
 
-  /// Stream with connection status messages
-  late final _connectionStatusStreamSubscription;
+  /// Stream subscription with bluetooth state messages
+  late final StreamSubscription? _bluetoothStateStreamSubscription;
+
+  /// Stream subscription with connection status messages
+  late final StreamSubscription? _connectionStatusStreamSubscription;
 
   @override
   Future<void> initialize() async {
-    await win.WinBle.initialize(
-      serverPath: await WinServer.path,
-      enableLog: true,
+    logger.fine("ble.initialize: setup subscriptions");
+
+    // Listen for bluetooth state
+    _bluetoothStateStreamSubscription = win.WinBle.bleState.listen(
+      (event) => bluetoothAdapterStateStreamController.add(
+        switch (event) {
+          win.BleState.On => BleBluetoothState.on,
+          win.BleState.Off => BleBluetoothState.off,
+          win.BleState.Unknown => BleBluetoothState.unknown,
+          win.BleState.Disabled => BleBluetoothState.disabled,
+          win.BleState.Unsupported => BleBluetoothState.unsupported,
+        },
+      ),
     );
 
     // Listen for connection events
@@ -108,10 +121,18 @@ class BleWinBle
         }
       }
     });
+
+    logger.fine("ble.initialize: starting");
+    await win.WinBle.initialize(
+      serverPath: await WinServer.path,
+      enableLog: true,
+    );
   }
 
   @override
   Future<void> dispose() {
+    _bluetoothStateStreamSubscription?.cancel();
+    _connectionStatusStreamSubscription?.cancel();
     win.WinBle.dispose();
     return Future.value();
   }
@@ -360,9 +381,11 @@ class BleWinBle
       {required String deviceId,
       required String deviceName,
       required BleUUID serviceUuid,
-      required BleUUID characteristicUuid}) {
-    // TODO: implement readCharacteristic
-    throw UnimplementedError("readCharacteristic");
+      required BleUUID characteristicUuid}) async {
+    return await win.WinBle.read(
+        address: deviceId,
+        serviceId: serviceUuid.str,
+        characteristicId: characteristicUuid.str);
   }
 
   @override

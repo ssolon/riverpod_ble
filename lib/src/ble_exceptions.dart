@@ -22,6 +22,22 @@ class RiverpodBleException with CausedBy implements Exception {
 }
 
 @immutable
+class BleInitializationError extends RiverpodBleException {
+  final String? reason;
+
+  const BleInitializationError({this.reason, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        "Initialization exception",
+        [
+          (n: 'reason', v: maybeUnknown(reason)),
+        ],
+        [],
+      );
+}
+
+@immutable
 class BleConnectionException extends RiverpodBleException with BleDeviceInfo {
   @override
   final String deviceId;

@@ -20,8 +20,11 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  Future<void> initialize() {
-    // TODO something here -- maybe check if Bluetooth available?
+  Future<void> initialize() async {
+    bluetoothAdapterStateStreamController.add(await FlutterBluePlus.isAvailable
+        ? BleBluetoothState.on
+        : BleBluetoothState.unknown);
+
     return Future.value();
   }
 
