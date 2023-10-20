@@ -445,6 +445,7 @@ class Initialization extends _$Initialization {
 /// Creates and handle a connection
 @riverpod
 class BleConnection extends _$BleConnection {
+  final _completer = Completer<BleDevice>();
   @override
   Future<BleDevice> build(String deviceId, String deviceName) async {
     _logger.fine('BleConnection: build');
@@ -469,26 +470,39 @@ class BleConnection extends _$BleConnection {
     });
     //!!!! Debugging
 
-    ref.listen(
-      initializationProvider,
-      (previous, next) async {
-        next.when(
-          data: (data) async {
-            // TODO Handle state change
-            if (data == BleBluetoothState.on) {
-              state = AsyncData(await connect());
-            }
-          },
-          error: (error, stackTrace) => throw ("BluetoothError: $error"),
-          loading: () {},
-        );
-      },
-      fireImmediately: true,
-    );
+    try {
+      ref.listen(
+        initializationProvider,
+        (previous, next) async {
+          next.when(
+            data: (data) async {
+              try {
+                // TODO Handle state change
+                if (data == BleBluetoothState.on) {
+                  _logger.fine("BleConnection: state=$data");
+                  state = AsyncData(await connect());
+                }
+              } catch (error, t) {
+                state = AsyncError(
+                    BleConnectionException(deviceId, deviceName, "Connecting",
+                        causedBy: error),
+                    t);
+              }
+            },
+            error: (error, stackTrace) => throw ("BluetoothError: $error"),
+            loading: () {},
+          );
+        },
+        fireImmediately: true,
+      );
+    } catch (error, t) {
+      state = AsyncError(
+          BleConnectionException(deviceId, deviceName, "Intialization",
+              causedBy: error),
+          t);
+    }
 
-    state = const AsyncValue<BleDevice>.loading();
-
-    return await connect();
+    return _completer.future;
   }
 
   FutureOr<BleDevice> connect() async {
