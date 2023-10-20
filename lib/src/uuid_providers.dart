@@ -157,10 +157,9 @@ class NameForCharacteristic extends _$NameForCharacteristic {
               } catch (e, t) {
                 _fail(e, t);
               }
-            } else {
-              state = AsyncData(n);
             }
           }
+          state = AsyncData(n);
         },
         error: (error, stack) => state = AsyncError(error, stack),
         loading: () => state = const AsyncLoading(),
