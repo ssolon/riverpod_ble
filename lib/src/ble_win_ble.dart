@@ -242,7 +242,7 @@ class BleWinBle
       BleUUID serviceUuid, String deviceId, String name) async {
     final service = await serviceFor(serviceUuid, deviceId, name);
 
-    if (service.characteristics == null) {
+    if (service.characteristics == null || service.characteristics!.isEmpty) {
       final nativeCharacteristics = await win.WinBle.discoverCharacteristics(
           address: deviceId, serviceId: serviceUuid.str);
 
@@ -357,7 +357,7 @@ class BleWinBle
     try {
       await win.WinBle.disconnect(deviceId);
       // TODO Should we delete the WinDevice if it was disconnected?
-      // TODO Might be a good idea now that we store servie
+      // TODO Might be a good idea now that we store services
     } catch (e) {
       throw BleDisconnectException(deviceId, deviceName, "", causedBy: e);
     }
@@ -442,9 +442,44 @@ class BleWinBle
       required String deviceId,
       required String deviceName,
       required BleUUID serviceUuid,
-      required BleUUID characteristicUuid}) {
-    // TODO: implement setNotifyCharacteristic
-    throw UnimplementedError("setNotifyCharacteristic");
+      required BleUUID characteristicUuid}) async {
+    try {
+      await characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+      if (notify) {
+        await win.WinBle.subscribeToCharacteristic(
+            address: deviceId,
+            serviceId: serviceUuid.str,
+            characteristicId: characteristicUuid.str);
+        return win.WinBle.characteristicValueStreamOf(
+                address: deviceId,
+                serviceId: serviceUuid.str,
+                characteristicId: characteristicUuid.str)
+            .map(
+          (value) {
+            return List<int>.from(value);
+          },
+        );
+      } else {
+        await win.WinBle.unSubscribeFromCharacteristic(
+            address: deviceId,
+            serviceId: serviceUuid.str,
+            characteristicId: characteristicUuid.str);
+        // TODO Separate to subscribe/unsubscribe so we don't pass back dummy?
+        return Future.value(StreamController<List<int>>().stream);
+      }
+    } catch (e) {
+      return Future.error(FailedToEnableNotification(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        reason: notify
+            ? "Subscribing to characteristic"
+            : "Unsubscribing from characteristic",
+        causedBy: e,
+      ));
+    }
   }
 
   @override
