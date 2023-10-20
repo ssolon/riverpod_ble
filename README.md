@@ -11,12 +11,28 @@ and the Flutter guide for
 [developing packages and plugins](https://flutter.dev/developing-packages).
 -->
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+A [Riverpod](https://riverpod.dev/) interface to access Bluetooth LE devices
+that supports multiple platforms.
+
+Flutter supports multiple platforms but there isn't a package with a single 
+API that supports all of them.
+This is an attempt fill that gap.
+
+Note that this is somewhat of an experiment in creating a package to support
+Bluetooth LE and, as of this writing, **should not be considered a finished, stable,
+full featured, product**.
+
+It's also my first major implementation using Riverpod so I'm not sure that
+best practices are being followed.
+
+This package builds on existing packages that provide platform specific implementations.
+
+Currently the following platforms are supported:
+* Android, IOS, MacOs using [flutter_blue_plus](https://pub.dev/packages/flutter_blue_plus)
+* Windows using [win_ble](https://pub.dev/packages/win_ble) 
 
 ## Getting started
 
