@@ -172,6 +172,7 @@ class CharacteristicException extends RiverpodBleException with BleDeviceInfo {
         (n: 'deviceName', v: deviceName),
         (n: 'deviceId', v: deviceId),
         (n: 'serviceUuid', v: serviceUuid),
+        (n: 'characteristicUuid', v: characteristicUuid),
       ], [
         (n: 'reason', v: reason ?? ''),
       ]);
