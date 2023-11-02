@@ -34,7 +34,9 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  void startScan({Duration timeout = const Duration(seconds: 30)}) {
+  void startScan(
+      {Duration timeout = const Duration(seconds: 30),
+      List<String>? withServices}) {
     FlutterBluePlus.startScan(timeout: timeout);
   }
 
@@ -139,7 +141,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  Future<BleDevice> connectTo(String deviceId, String deviceName) async {
+  Future<BleDevice> connectTo(String deviceId, String deviceName,
+      [List<String> services = const <String>[]]) async {
     final native = deviceFor(deviceId, deviceName);
     await native.connect();
     return Future.value(bleDeviceFor(native));

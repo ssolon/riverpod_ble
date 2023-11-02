@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:riverpod_ble/src/ble_win_ble.dart';
+// import 'package:riverpod_ble/src/ble_web.dart';
+// import 'package:riverpod_ble/src/ble_win_ble.dart';
 
 import '../riverpod_ble.dart';
-import 'ble_flutter_blue_plus.dart';
+// import 'ble_flutter_blue_plus.dart';
 //import 'ble_quick_blue.dart';
 import 'states/ble_scan_result.dart';
+
+import 'non_web_backend.dart' if (dart.library.html) 'web_backend.dart';
 
 part 'ble.g.dart';
 
@@ -16,6 +19,7 @@ part 'ble.g.dart';
 enum Backend {
   flutterBluePlus,
   winBle,
+  webBle,
 }
 
 /// States that Bluetooth controller can be in
@@ -49,26 +53,7 @@ void riverpodBleInit({
   Logger.root.onRecord.listen(logRecord);
   Logger.root.level = rootLoggingLevel;
 
-  backend ??= switch (defaultTargetPlatform) {
-    TargetPlatform.windows => Backend.winBle,
-    TargetPlatform.android ||
-    TargetPlatform.iOS ||
-    TargetPlatform.macOS =>
-      Backend.flutterBluePlus,
-    _ => throw Exception("Unsupported platform=$defaultTargetPlatform"),
-  };
-
-  switch (backend) {
-    case Backend.flutterBluePlus:
-      _ble = FlutterBluePlusBle();
-      break;
-
-    case Backend.winBle:
-      _ble = BleWinBle();
-      // initialize should by called by initializationProvider
-      // await _ble.initialize();
-      break;
-  }
+  _ble = setupBackend();
 }
 
 late Ble _ble; // = FlutterBluePlusBle();
@@ -92,6 +77,15 @@ abstract class Ble<T, S, C, D> {
 
   /// Scanner
 
+  bool get scannerNeedsServiceUuids => false;
+
+  /// Does a connection request require service uuids?
+  ///
+  /// Similar to [scannerNeedsServiceUuids] some backends (e.g. web) for
+  /// security reasons, require that the uuids of the service that will be
+  /// accessed be provided when connecting to a device.
+  bool get connectionRequiresServiceUuids => false;
+
   /// Stream of scanner status (true = scanning)
   Stream<bool> get scannerStatusStream;
 
@@ -102,7 +96,11 @@ abstract class Ble<T, S, C, D> {
   Stream<List<BleScannedDevice>> get scannerResults;
 
   /// Start the scanner with [timeout] default of 30 seconds
-  void startScan({Duration timeout = const Duration(seconds: 30)});
+  /// and filtering by [withServices] which may be required if
+  /// [scannerNeedsServiceUuids] is true.
+  void startScan(
+      {Duration timeout = const Duration(seconds: 30),
+      List<String>? withServices});
 
   /// Stop the scanner
   void stopScan();
@@ -152,6 +150,7 @@ abstract class Ble<T, S, C, D> {
   }
 
   /// Create a [BleDevice] for the native device [native]
+  // TODO This should be deviceFrom to be consistent with other names
   Future<BleDevice> bleDeviceFor(T native) async => BleDevice(
         deviceId: deviceIdOf(native),
         name: nameOf(native),
@@ -163,7 +162,11 @@ abstract class Ble<T, S, C, D> {
   Future<List<BleDevice>> connectedDevices();
 
   /// Connect to a device [deviceId]
-  Future<BleDevice> connectTo(String deviceId, String deviceName);
+  ///
+  /// Some platforms (e.g. web) will require the services that will be accessed
+  /// to be defined as [services].
+  Future<BleDevice> connectTo(String deviceId, String deviceName,
+      [List<String> services = const <String>[]]);
 
   /// Return the native services for [deviceId]
   Future<List<S>> servicesFor(String deviceId, String name);
@@ -275,6 +278,17 @@ abstract class Ble<T, S, C, D> {
   String exceptionDisplayMessage(Object o);
 }
 
+/// Does the scanner require service uuids?
+///
+/// Some backends require that the services they will access be specified and
+/// the resulting be limited to only those devices which advertise the
+/// services specified and/or will only allow access to those services that
+/// were defined.
+
+@riverpod
+bool scannerNeedsServiceUuids(ScannerNeedsServiceUuidsRef ref) =>
+    _ble.scannerNeedsServiceUuids;
+
 /// Scanner for BLE devices.
 ///
 /// Notifies with [BleScanResult] object which can contain either a list of
@@ -295,7 +309,7 @@ class BleScanner extends _$BleScanner {
     ref.listen(
       initializationProvider,
       (previous, next) {
-        logger.fine("BleScanner.build next=$next");
+        _logger.fine("BleScanner.build next=$next");
         next.maybeWhen(
           data: (data) {
             _statusSubscription = _ble.scannerStatusStream.listen(
@@ -309,9 +323,9 @@ class BleScanner extends _$BleScanner {
             );
 
             // TODO Handle bluetooth state changes/errors
-            if (data == BleBluetoothState.on) {
-              start();
-            }
+            // if (data == BleBluetoothState.on) {
+            // start();
+            // }
           },
           error: (error, stackTrace) {
             throw BleInitializationError(
@@ -335,7 +349,7 @@ class BleScanner extends _$BleScanner {
   }
 
   /// (Re)start scanning
-  void start() {
+  void start(List<String>? withServices) {
     _logger.info("Start scanning...");
     stop();
 
@@ -347,7 +361,7 @@ class BleScanner extends _$BleScanner {
       _logger.severe("BleScanner: Error=$error");
     });
 
-    _ble.startScan();
+    _ble.startScan(withServices: withServices);
   }
 
   /// Stop scanning
@@ -368,9 +382,6 @@ class BleScanner extends _$BleScanner {
 /// none of the status events.
 ///
 /// Watch [bleScannerStatusProvider] for scanner status.
-///
-/// A rescan can be triggered by:
-///         ```ref.invalidate(bleScannerProvider)```
 ///
 @riverpod
 class BleScannedDevices extends _$BleScannedDevices {
@@ -422,12 +433,12 @@ class Initialization extends _$Initialization {
 
   @override
   FutureOr<BleBluetoothState> build() async {
-    logger.info("BleInitialize");
+    _logger.info("BleInitialize");
 
     _bluetoothStateSubscription =
         bluetoothAdapterStateStreamController.stream.listen(
       (event) {
-        logger.fine("BleBluetoothState=$event");
+        _logger.fine("BleBluetoothState=$event");
         state = AsyncData(event);
       },
     );
@@ -484,8 +495,11 @@ class BleConnection extends _$BleConnection {
                 }
               } catch (error, t) {
                 state = AsyncError(
-                    BleConnectionException(deviceId, deviceName, "Connecting",
-                        causedBy: error),
+                    error is BleConnectionException
+                        ? error
+                        : BleConnectionException(
+                            deviceId, deviceName, "Connecting",
+                            causedBy: error),
                     t);
               }
             },

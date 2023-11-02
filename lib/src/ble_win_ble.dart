@@ -138,7 +138,9 @@ class BleWinBle
   }
 
   @override
-  void startScan({Duration timeout = const Duration(seconds: 30)}) {
+  void startScan(
+      {Duration timeout = const Duration(seconds: 30),
+      List<String>? withServices}) {
     _devicesSeen.clear();
 
     scannerStream = win.WinBle.scanStream.listen(
@@ -282,7 +284,8 @@ class BleWinBle
   }
 
   @override
-  Future<BleDevice> connectTo(String deviceId, String deviceName) async {
+  Future<BleDevice> connectTo(String deviceId, String deviceName,
+      [List<String> services = const <String>[]]) async {
     final completer = Completer<BleDevice>();
 
     try {

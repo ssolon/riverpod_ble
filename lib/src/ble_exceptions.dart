@@ -61,6 +61,14 @@ class BleConnectionException extends RiverpodBleException with BleDeviceInfo {
 }
 
 @immutable
+class BleConnectionRequiresServices extends BleConnectionException {
+  const BleConnectionRequiresServices(String deviceId, String deviceName,
+      {causedBy})
+      : super(deviceId, deviceName, "Connection requires service definitions",
+            causedBy: causedBy);
+}
+
+@immutable
 class BleDisconnectException extends BleConnectionException {
   const BleDisconnectException(super.deviceId, super.deviceName, super.reason,
       {super.causedBy});
