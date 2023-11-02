@@ -995,26 +995,42 @@ FutureOr<bool?> bleIsConnectedFromException(Exception e) async {
   return await _ble.isConnected(deviceInfo.deviceId, deviceInfo.deviceName);
 }
 
-/// Return
+/// Return a message suitable for display for [e]
+///
+/// Try to do better:
+/// We want to display what we were doing and what caused the problems which
+/// should be the [e] itself and if [e] is a [RiverpodBleException] used
+/// the [causedBy] to find the root should be the underlying cause for
+/// the top exception to have failed.
+///
 Future<String> bleExceptionDisplayMessage(Object e) async {
   if (e is Exception) {
-    // Let's start out by just displaying the rootCause
-
     final root = CausedBy.rootCause(e);
-    if (root is RiverpodBleException) {
+    if (e is RiverpodBleException) {
       // If we're not connected -- nothing else matters so check that first
       final maybeConnected = await bleIsConnectedFromException(e);
       if (maybeConnected != null && !maybeConnected) {
         return "Device is not connected";
       }
 
-      // Connected -- return message from our exception
-      // TODO Add "displayMessage" method to RiverpodBleException?
-      return root.toString();
+      // Show cause if it's different using platform specfic code if it's
+      // not one of our exceptions.
+
+      String cause = "";
+      if (e != root && e.causedBy != root) {
+        final message = (root is RiverpodBleException)
+            ? e.toString()
+            : _ble.exceptionDisplayMessage(root);
+        cause = " causedBy=$message";
+      }
+
+      return "${e.toString()}$cause";
     } else {
       // Maybe process as native exception
-      return _ble.exceptionDisplayMessage(root);
+      return _ble.exceptionDisplayMessage(e);
     }
+  } else {
+    return e.toString();
   }
 
   // Can't figure anything else just use toString()
