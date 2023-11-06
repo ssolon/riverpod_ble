@@ -1,15 +1,11 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-// import 'package:riverpod_ble/src/ble_web.dart';
-// import 'package:riverpod_ble/src/ble_win_ble.dart';
 
 import '../riverpod_ble.dart';
-// import 'ble_flutter_blue_plus.dart';
-//import 'ble_quick_blue.dart';
 import 'states/ble_scan_result.dart';
 
+// Can't build web with other backends so use conditional import to choose
 import 'non_web_backend.dart' if (dart.library.html) 'web_backend.dart';
 
 part 'ble.g.dart';
