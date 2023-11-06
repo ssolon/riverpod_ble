@@ -131,10 +131,11 @@ abstract class Ble<T, S, C, D> {
   Stream<BleConnectionState> connectionStreamFor(
       String deviceId, String deviceName);
 
-  /// Get the service (if present) from a native device
+  /// Get the services (if present) from a native device
   Future<List<S>?> servicesFrom(T native);
 
   /// Return the device for [deviceId] or [null]
+  /// FIXME Why is this here when we have [device(deviceId)]
   T? maybeDeviceFor(String deviceId) => device(deviceId);
 
   /// Return the device for [deviceId] or create a new one
@@ -168,12 +169,14 @@ abstract class Ble<T, S, C, D> {
   Future<List<S>> servicesFor(String deviceId, String name);
 
   /// Return the services for [deviceId]
+  /// FIXME Default definition using servicesFor?
   Future<List<BleService>> bleServicesFor(String deviceId, String name);
 
   /// Disconnect from device
   Future<void> disconnectFrom(String deviceId, String deviceName);
 
-  BleService bleServiceFrom(S nativeService, String deviceName);
+  FutureOr<BleService> bleServiceFrom(
+      S nativeService, String deviceId, String deviceName);
   BleUUID serviceUuidFrom(S nativeService);
 
   Future<S> serviceFor(
@@ -196,11 +199,8 @@ abstract class Ble<T, S, C, D> {
 
   BleUUID characteristicUuidFrom(C nativeCharacteristic);
 
-  BleCharacteristic bleCharacteristicFrom(
-    C nativeCharacteristic,
-    String deviceName,
-    // [BleUUID? serviceUuid, String? deviceId]);
-  );
+  BleCharacteristic bleCharacteristicFrom(C nativeCharacteristic,
+      String deviceName, BleUUID serviceUuid, String deviceId);
 
   Future<C> characteristicFor(BleUUID characteristicUuid, BleUUID serviceUuid,
       String deviceId, String name) async {
@@ -674,7 +674,8 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
                     serviceUuid, deviceId, deviceName);
                 final results = nativeResults
                     .map(
-                      (e) => _ble.bleCharacteristicFrom(e, deviceName),
+                      (e) => _ble.bleCharacteristicFrom(
+                          e, deviceName, serviceUuid, deviceId),
                     )
                     .toList();
                 _logger
@@ -741,7 +742,8 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
                   deviceId,
                   deviceName,
                 );
-                state = AsyncData(_ble.bleCharacteristicFrom(c, deviceName));
+                state = AsyncData(_ble.bleCharacteristicFrom(
+                    c, deviceName, serviceUuid, deviceId));
               } catch (e, t) {
                 state = AsyncError(_fail(e), t);
               }
@@ -1039,8 +1041,6 @@ Future<String> bleExceptionDisplayMessage(Object e) async {
       // Maybe process as native exception
       return _ble.exceptionDisplayMessage(e);
     }
-  } else {
-    return e.toString();
   }
 
   // Can't figure anything else just use toString()

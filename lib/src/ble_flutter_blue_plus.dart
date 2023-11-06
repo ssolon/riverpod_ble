@@ -164,7 +164,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
     try {
       final services = await servicesFor(deviceId, name);
       final result = <BleService>[
-        for (final s in services) bleServiceFrom(s, name),
+        for (final s in services) await bleServiceFrom(s, deviceId, name),
       ];
 
       return Future.value(result);
@@ -187,7 +187,10 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
 
   @override
   BleCharacteristic bleCharacteristicFrom(
-      BluetoothCharacteristic nativeCharacteristic, String deviceName) {
+      BluetoothCharacteristic nativeCharacteristic,
+      String deviceName,
+      BleUUID serviceUuid,
+      String deviceId) {
     final c = nativeCharacteristic;
     final deviceId = c.remoteId.str;
 
@@ -229,14 +232,24 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
-  BleService bleServiceFrom(BluetoothService nativeService, String deviceName) {
+  FutureOr<BleService> bleServiceFrom(
+      BluetoothService nativeService, String deviceId, String deviceName) {
     final s = nativeService;
     final deviceId = s.remoteId.str;
+    final serviceUuid = BleUUID(s.serviceUuid.toString());
     return BleService(
       deviceId,
       deviceName,
-      BleUUID(s.serviceUuid.toString()),
-      [for (final c in s.characteristics) bleCharacteristicFrom(c, deviceName)],
+      serviceUuid,
+      [
+        for (final c in s.characteristics)
+          bleCharacteristicFrom(
+            c,
+            deviceName,
+            serviceUuid,
+            deviceId,
+          )
+      ],
     );
   }
 
