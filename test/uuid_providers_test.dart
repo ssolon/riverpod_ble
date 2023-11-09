@@ -140,6 +140,87 @@ void main() {
   });
   // TODO Add test nameForServiceProvider when yaml can't be loaded
 
+  group('Test serviceDefinitionsProvider', () {
+    List<String> names(List<UuidDef> defs) => defs.map((d) => d.name).toList();
+
+    late ProviderContainer container;
+    setUp(() {
+      container = ProviderContainer();
+    });
+
+    tearDown(() {
+      container.dispose();
+    });
+
+    test('Lookup single name by whole name lower case', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final def = await definitions.lookupByName("fitness machine");
+      expect(def, isNotNull);
+      expect(def, hasLength(1));
+      expect(def[0].name, 'Fitness Machine');
+    });
+
+    test('Lookup single name by whole name mixed case', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final def = await definitions.lookupByName("fitness machine");
+      expect(def, isNotNull);
+      expect(def, hasLength(1));
+      expect(def[0].name, 'Fitness Machine');
+    });
+
+    test('Lookup single name by whole name upper case', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final def = await definitions.lookupByName("fitness machine");
+
+      expect(def, isNotNull);
+      expect(def, hasLength(1));
+      expect(def[0].name, 'Fitness Machine');
+    });
+
+    test('Lookup multiple names by mixed case prefix', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final defs = await definitions.lookupByName('Cycling');
+
+      expect(defs, hasLength(2));
+      expect(names(defs),
+          containsAll(['Cycling Speed and Cadence', 'Cycling Power']));
+    });
+
+    test('Lookup multiple names by lower case prefix', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final defs = await definitions.lookupByName('cycling');
+
+      expect(defs, hasLength(2));
+      expect(names(defs),
+          containsAll(['Cycling Speed and Cadence', 'Cycling Power']));
+    });
+
+    test('Lookup multiple names by upper case prefix', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final defs = await definitions.lookupByName('CYCLING');
+
+      expect(defs, hasLength(2));
+      expect(names(defs),
+          containsAll(['Cycling Speed and Cadence', 'Cycling Power']));
+    });
+
+    test('Lookup multiple names by prefix with space', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final defs = await definitions.lookupByName('Generic A');
+
+      expect(defs, hasLength(2));
+      expect(names(defs), containsAll(['Generic Access', 'Generic Attribute']));
+    });
+
+    test('Lookup using regex', () async {
+      final definitions = container.read(serviceDefinitionsProvider.notifier);
+      final defs = await definitions.lookupByName(RegExp(r'.*power.*'));
+
+      expect(defs, hasLength(2));
+      expect(names(defs), containsAll(['Tx Power', 'Cycling Power']));
+    });
+  });
+
   group('Test characteristic name provider',
       skip: 'Need to mock read characterisic', () {
     final tc = BleCharacteristic(

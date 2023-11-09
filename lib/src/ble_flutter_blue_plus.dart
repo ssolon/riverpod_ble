@@ -37,7 +37,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
       List<String>? withServices}) {
-    FlutterBluePlus.startScan(timeout: timeout);
+    final guids = withServices?.map((e) => Guid(e)).toList() ?? [];
+    FlutterBluePlus.startScan(timeout: timeout, withServices: guids);
   }
 
   @override
