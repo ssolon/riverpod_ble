@@ -39,8 +39,8 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
     });
 
     try {
-      print("Load definitions from $yamlFilePath");
-      _logger.fine("UuidDefinitionFromYaml: build");
+      _logger
+          .fine("UuidDefinitionFromYaml: Load definitions from $yamlFilePath");
       final yamlString = await rootBundle.loadString(yamlFilePath);
       final yamlMap = loadYaml(yamlString) as Map;
 
@@ -67,7 +67,7 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
   /// a prefix match or a [RegExp] which will attempt to match
   /// against each name.
   List<UuidDef> lookupByName(dynamic name) {
-    print("Lookup by name=$name");
+    _logger.fine("LookupByName: name=$name");
     return switch (name) {
       String s => matchPrefix(s),
       RegExp r => matchRegex(r),
