@@ -140,7 +140,7 @@ class BleWinBle
   @override
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
-      List<String>? withServices}) {
+      List<BleUUID>? withServices}) {
     _devicesSeen.clear();
 
     scannerStream = win.WinBle.scanStream.listen(

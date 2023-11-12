@@ -71,7 +71,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   @override
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
-      List<String>? withServices}) async {
+      List<BleUUID>? withServices}) async {
     _logger.fine("web startScan withServices=$withServices");
     if (_webBluetooth.hasRequestLEScan) {
       // We can do a real scan!
@@ -79,7 +79,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
     } else {
       _logger.info("startScan: LEScan is not available using requestDevice");
 
-      final services = withServices ?? <String>[];
+      final services = withServices?.map((e) => e.str).toList() ?? <String>[];
 
       _setScanning(true);
 

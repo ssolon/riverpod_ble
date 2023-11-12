@@ -36,8 +36,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   @override
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
-      List<String>? withServices}) {
-    final guids = withServices?.map((e) => Guid(e)).toList() ?? [];
+      List<BleUUID>? withServices}) {
+    final guids = withServices?.map((e) => Guid(e.str)).toList() ?? [];
     FlutterBluePlus.startScan(timeout: timeout, withServices: guids);
   }
 
@@ -60,7 +60,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
                 deviceId: r.device.remoteId.str,
                 name: r.device.platformName,
                 services: r.advertisementData.serviceUuids
-                    .map((e) => BleUUID(e))
+                    .map((e) => BleUUID(e.uuid128))
                     .toList(),
               ),
               r.rssi,
@@ -77,7 +77,9 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
 
   @override
   Future<List<BluetoothService>> servicesFrom(BluetoothDevice device) async {
-    return device.servicesList ?? await device.discoverServices();
+    return (device.servicesList ?? []).isEmpty
+        ? await device.discoverServices()
+        : device.servicesList;
   }
 
   @override

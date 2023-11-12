@@ -96,7 +96,7 @@ abstract class Ble<T, S, C, D> {
   /// [scannerNeedsServiceUuids] is true.
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
-      List<String>? withServices});
+      List<BleUUID>? withServices});
 
   /// Stop the scanner
   void stopScan();
@@ -345,7 +345,7 @@ class BleScanner extends _$BleScanner {
   }
 
   /// (Re)start scanning
-  void start(List<String>? withServices) {
+  void start(List<BleUUID>? withServices) {
     _logger.info("Start scanning...");
     stop();
 
