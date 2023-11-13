@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_web_bluetooth/flutter_web_bluetooth.dart' as web;
 import 'package:logging/logging.dart';
@@ -365,8 +366,30 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
       required String deviceId,
       required String deviceName,
       required BleUUID serviceUuid,
-      required BleUUID characteristicUuid}) {
-    // TODO: implement setNotifyCharacteristic
-    throw UnimplementedError();
+      required BleUUID characteristicUuid}) async {
+    try {
+      final native = await characteristicFor(
+        characteristicUuid,
+        serviceUuid,
+        deviceId,
+        deviceName,
+      );
+
+      if (notify && !native.isNotifying) {
+        native.startNotifications();
+      } else if (!notify && native.isNotifying) {
+        native.stopNotifications();
+      }
+
+      return Future.value(native.value
+          .map((v) => List<int>.from(Uint8List.view(v.buffer).map((e) => e))));
+    } catch (e) {
+      return Future.error(ReadingCharacteristicException(
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          deviceName: deviceName,
+          causedBy: e));
+    }
   }
 }
