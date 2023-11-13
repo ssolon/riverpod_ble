@@ -76,10 +76,10 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   String nameOf(BluetoothDevice native) => native.platformName;
 
   @override
-  Future<List<BluetoothService>> servicesFrom(BluetoothDevice device) async {
-    return (device.servicesList ?? []).isEmpty
-        ? await device.discoverServices()
-        : device.servicesList;
+  Future<List<BluetoothService>> servicesFrom(BluetoothDevice native) async {
+    return native.servicesList.isEmpty
+        ? await native.discoverServices()
+        : native.servicesList;
   }
 
   @override
@@ -148,6 +148,12 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
       [List<String> services = const <String>[]]) async {
     final native = deviceFor(deviceId, deviceName);
     await native.connect();
+
+    // Version 1.28.9 no long clears services on disconnect or reconnect
+    // so we'll always do the discover here
+    // We'll probably need it anyway!
+    await native.discoverServices();
+
     return Future.value(bleDeviceFor(native));
   }
 
