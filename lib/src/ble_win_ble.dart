@@ -311,7 +311,7 @@ class BleWinBle
         completer.completeError(e, t);
       }
 
-      win.WinBle.connect(device.deviceId);
+      await win.WinBle.connect(device.deviceId);
 
       // Wait for the status to go through our connection stream
     } catch (e, t) {
