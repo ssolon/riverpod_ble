@@ -319,10 +319,10 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
     try {
       final characteristic = await characteristicFor(
           characteristicUuid, serviceUuid, deviceId, deviceName);
-      return await readDescriptorMutex.protect(() async {
-        final values = await characteristic.read();
-        return Future.value(values);
-      });
+      // return await readDescriptorMutex.protect(() async {
+      final values = await characteristic.read();
+      return Future.value(values);
+      // });
     } catch (e) {
       return Future.error(CharacteristicException(
         characteristicUuid: characteristicUuid,
