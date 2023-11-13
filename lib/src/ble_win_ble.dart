@@ -140,7 +140,7 @@ class BleWinBle
   @override
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
-      List<String>? withServices}) {
+      List<BleUUID>? withServices}) {
     _devicesSeen.clear();
 
     scannerStream = win.WinBle.scanStream.listen(
@@ -187,7 +187,8 @@ class BleWinBle
       _scannerResultsStreamController.stream;
 
   @override
-  BleCharacteristic bleCharacteristicFrom(nativeCharacteristic, deviceName) {
+  BleCharacteristic bleCharacteristicFrom(
+      nativeCharacteristic, deviceName, serviceUuid, deviceId) {
     final props = nativeCharacteristic.properties;
 
     return BleCharacteristic(
@@ -221,13 +222,15 @@ class BleWinBle
   }
 
   List<BleCharacteristic> bleCharacteristicsFrom(WinBleService nativeService) {
-    return List<BleCharacteristic>.from(nativeService.characteristics
-            ?.map((e) => bleCharacteristicFrom(e, e.deviceName)) ??
+    return List<BleCharacteristic>.from(nativeService.characteristics?.map(
+            (e) => bleCharacteristicFrom(e, e.deviceName,
+                nativeService.serviceUuid, nativeService.deviceId)) ??
         <BleCharacteristic>[]);
   }
 
   @override
-  BleService bleServiceFrom(WinBleService nativeService, String deviceName) =>
+  BleService bleServiceFrom(
+          WinBleService nativeService, String deviceId, String deviceName) =>
       BleService(
         nativeService.deviceId,
         nativeService.deviceName,
@@ -427,7 +430,8 @@ class BleWinBle
               s.deviceName,
               s.serviceUuid,
               (s.characteristics ?? [])
-                  .map((e) => bleCharacteristicFrom(e, name))
+                  .map((e) =>
+                      bleCharacteristicFrom(e, name, s.serviceUuid, s.deviceId))
                   .toList(),
             ))
         .toList();

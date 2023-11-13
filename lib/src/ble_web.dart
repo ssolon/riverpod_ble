@@ -71,7 +71,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   @override
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
-      List<String>? withServices}) async {
+      List<BleUUID>? withServices}) async {
     _logger.fine("web startScan withServices=$withServices");
     if (_webBluetooth.hasRequestLEScan) {
       // We can do a real scan!
@@ -79,7 +79,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
     } else {
       _logger.info("startScan: LEScan is not available using requestDevice");
 
-      final services = withServices ?? <String>[];
+      final services = withServices?.map((e) => e.str).toList() ?? <String>[];
 
       _setScanning(true);
 
@@ -135,9 +135,17 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
 
   @override
   BleCharacteristic bleCharacteristicFrom(
-      web.BluetoothCharacteristic nativeCharacteristic, String deviceName) {
-    // TODO: implement bleCharacteristicFrom
-    throw UnimplementedError();
+      web.BluetoothCharacteristic nativeCharacteristic,
+      String deviceName,
+      BleUUID serviceUuid,
+      String deviceId) {
+    return BleCharacteristic(
+        deviceId: deviceId,
+        deviceName: deviceName,
+        serviceUuid: serviceUuid,
+        characteristicUuid: BleUUID(nativeCharacteristic.uuid),
+        properties: _blePropertiesFromNative(nativeCharacteristic.properties),
+        descriptors: []);
   }
 
   @override
@@ -148,31 +156,92 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   }
 
   @override
-  BleService bleServiceFrom(
-      web.BluetoothService nativeService, String deviceName) {
-    // TODO: implement bleServiceFrom
-    throw UnimplementedError();
+  BleUUID serviceUuidFrom(web.BluetoothService nativeService) =>
+      BleUUID(nativeService.uuid);
+
+  @override
+  Future<List<web.BluetoothService>> servicesFor(
+      String deviceId, String name) async {
+    final native = device(deviceId);
+    if (native != null) {
+      return Future.value(await servicesFrom(native));
+    } else {
+      return <web.BluetoothService>[];
+    }
   }
 
   @override
-  Future<List<BleService>> bleServicesFor(String deviceId, String name) {
-    // TODO: implement bleServicesFor
-    throw UnimplementedError();
+  Future<List<web.BluetoothService>?> servicesFrom(BleWebDevice native) async {
+    return (await native.nativeDevice.services.first);
+  }
+
+  @override
+  FutureOr<BleService> bleServiceFrom(web.BluetoothService nativeService,
+      String deviceId, String deviceName) async {
+    final serviceUuid = serviceUuidFrom(nativeService);
+
+    final bleCharacteristics = (await characteristicsFrom(nativeService))
+        .map((s) => bleCharacteristicFrom(s, deviceName, serviceUuid, deviceId))
+        .toList(growable: false);
+
+    return BleService(
+      deviceId,
+      deviceName,
+      serviceUuid,
+      bleCharacteristics,
+      isPrimary: nativeService.isPrimary,
+    );
+  }
+
+  BleCharacteristicProperties _blePropertiesFromNative(
+          web.BluetoothCharacteristicProperties p) =>
+      BleCharacteristicProperties(
+        broadcast: p.broadcast,
+        read: p.read,
+        writeWithoutResponse: p.writeWithoutResponse,
+        write: p.write,
+        notify: p.notify,
+        indicate: p.indicate,
+        authenticatedSignedWrites: p.authenticatedSignedWrites,
+        extendedProperties: false,
+        notifyEncryptionRequired: false,
+        indicateEncryptionRequired: false,
+      );
+
+  @override
+  Future<List<BleService>> bleServicesFor(String deviceId, String name) async {
+    final services = await servicesFor(deviceId, name);
+    return Future.wait(
+        services.map((s) async => (bleServiceFrom(s, deviceId, name))));
   }
 
   @override
   BleUUID characteristicUuidFrom(
-      web.BluetoothCharacteristic nativeCharacteristic) {
-    // TODO: implement characteristicUuidFrom
-    throw UnimplementedError();
-  }
+          web.BluetoothCharacteristic nativeCharacteristic) =>
+      BleUUID(nativeCharacteristic.uuid.toString());
 
   @override
   Future<List<web.BluetoothCharacteristic>> characteristicsFor(
-      BleUUID serviceUuid, String deviceId, String name) {
-    // TODO: implement characteristicsFor
-    throw UnimplementedError();
+      BleUUID serviceUuid, String deviceId, String name) async {
+    final nativeDevice = device(deviceId);
+    // FIXME Throw if no device?
+    if (nativeDevice != null) {
+      final nativeServices = await servicesFrom(nativeDevice);
+      if (nativeServices != null) {
+        final nativeService = nativeServices
+            .where((e) => BleUUID(e.uuid.toString()) == serviceUuid);
+        if (nativeService.isNotEmpty) {
+          return characteristicsFrom(nativeService.first);
+        }
+      }
+    }
+
+    return Future.value([]);
   }
+
+  Future<List<web.BluetoothCharacteristic>> characteristicsFrom(
+          web.BluetoothService nativeService) async =>
+      await nativeService.getCharacteristics();
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
@@ -287,24 +356,6 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
       required BleUUID characteristicUuid,
       required BleUUID descriptorUuid}) {
     // TODO: implement readDescriptor
-    throw UnimplementedError();
-  }
-
-  @override
-  BleUUID serviceUuidFrom(web.BluetoothService nativeService) {
-    // TODO: implement serviceUuidFrom
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<web.BluetoothService>> servicesFor(String deviceId, String name) {
-    // TODO: implement servicesFor
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<web.BluetoothService>?> servicesFrom(BleWebDevice native) {
-    // TODO: implement servicesFrom
     throw UnimplementedError();
   }
 

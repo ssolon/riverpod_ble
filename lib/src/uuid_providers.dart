@@ -13,13 +13,19 @@ part 'uuid_providers.g.dart';
 
 final _logger = Logger("UUidProviders");
 
+/// Path for service definitions
+const servicesPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
+
 @immutable
 class UuidDef {
   final String uuid;
   final String name;
+  late final String matchName;
   final String id;
 
-  const UuidDef(this.uuid, this.name, this.id);
+  UuidDef(this.uuid, this.name, this.id) {
+    matchName = name.toLowerCase();
+  }
 }
 
 @riverpod
@@ -33,7 +39,8 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
     });
 
     try {
-      _logger.fine("UuidDefinitionFromYaml: build");
+      _logger
+          .fine("UuidDefinitionFromYaml: Load definitions from $yamlFilePath");
       final yamlString = await rootBundle.loadString(yamlFilePath);
       final yamlMap = loadYaml(yamlString) as Map;
 
@@ -51,6 +58,30 @@ class UuidDefinitionsFromYaml extends _$UuidDefinitionsFromYaml {
   /// Lookup a definition by [uuid]
   UuidDef? lookup(int uuid) {
     return _defs[uuid];
+  }
+
+  /// Lookup a definition by [name]
+  ///
+  /// Returns all definitions that match [name]
+  /// where [name] is either a [String] which will perform
+  /// a prefix match or a [RegExp] which will attempt to match
+  /// against each name.
+  List<UuidDef> lookupByName(dynamic name) {
+    _logger.fine("LookupByName: name=$name");
+    return switch (name) {
+      String s => matchPrefix(s),
+      RegExp r => matchRegex(r),
+      _ => matchPrefix(name.toString()),
+    };
+  }
+
+  List<UuidDef> matchPrefix(String s) {
+    final prefix = s.toLowerCase();
+    return _defs.values.where((e) => e.matchName.startsWith(prefix)).toList();
+  }
+
+  List<UuidDef> matchRegex(RegExp r) {
+    return _defs.values.where((e) => r.hasMatch(e.matchName)).toList();
   }
 }
 
@@ -99,7 +130,6 @@ Future<String> nameFor(NameForRef ref, BleUUID bleUUID, String yamlPath) async {
 
 @riverpod
 FutureOr<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
-  const servicesPath = 'packages/riverpod_ble/files/yaml/service_uuids.yaml';
   final completer = Completer<String>();
 
   ref.listen(
@@ -113,6 +143,37 @@ FutureOr<String> nameForService(NameForServiceRef ref, BleUUID bleUUID) async {
   );
 
   return completer.future;
+}
+
+@riverpod
+class ServiceDefinitions extends _$ServiceDefinitions {
+  final _completer = Completer();
+
+  @override
+  Future<void> build() {
+    ref.listen(
+      uuidDefinitionsFromYamlProvider(servicesPath),
+      (previous, next) {
+        if (next.hasValue) {
+          _completer.complete();
+        }
+      },
+      fireImmediately: true,
+    );
+
+    return _completer.future;
+  }
+
+  /// Return a list of the [UuidDef] that match [stringOrRegex] matching
+  /// as a prefix when a [String] and [RegExp] using [match] when [RegExp].
+  /// All matches use [toLower] on the values checked.
+  FutureOr<List<UuidDef>> lookupByName(dynamic stringOrRegex) async {
+    await _completer.future;
+
+    return ref
+        .read(uuidDefinitionsFromYamlProvider(servicesPath).notifier)
+        .lookupByName(stringOrRegex);
+  }
 }
 
 @riverpod
