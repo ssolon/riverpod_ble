@@ -33,6 +33,7 @@ This package builds on existing packages that provide platform specific implemen
 Currently the following platforms are supported:
 * Android, IOS, MacOs using [flutter_blue_plus](https://pub.dev/packages/flutter_blue_plus)
 * Windows using [win_ble](https://pub.dev/packages/win_ble) 
+* Web using [flutter_web_bluetooth](https://pub.dev/packages/flutter_web_bluetooth)
 
 ## Getting started
 
