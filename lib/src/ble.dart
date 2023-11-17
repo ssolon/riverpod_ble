@@ -236,31 +236,20 @@ abstract class Ble<T, S, C, D> {
     required BleUUID characteristicUuid,
   });
 
-  List<D> descriptorsFrom(C nativeCharacteristic);
   BleUUID descriptorUuidFrom(D nativeDescriptor);
-  BleDescriptor bleDescriptorFor(D nativeDescriptor, String deviceName);
 
-  Future<D> descriptorFor(BleUUID descriptorUuid, BleUUID characteristicUuid,
-      BleUUID serviceUuid, String deviceId, String name) async {
-    final nativeCharacteristic =
-        characteristicFor(characteristicUuid, serviceUuid, deviceId, name);
-    final descriptors = descriptorsFrom(await nativeCharacteristic);
+  // TODO Do we need these here anymore?
+  // BleDescriptor bleDescriptorFrom(D nativeDescriptor, String deviceName);
 
-    final nativeDescriptor = descriptors.where(
-      (element) => descriptorUuidFrom(element) == descriptorUuid,
-    );
+  FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName);
 
-    if (nativeDescriptor.isEmpty) {
-      throw UnknownDescriptorException(
-          descriptorUuid: descriptorUuid,
-          characteristicUuid: characteristicUuid,
-          serviceUuid: serviceUuid,
-          deviceId: deviceId,
-          name: name);
-    }
-
-    return Future.value(nativeDescriptor.first);
-  }
+  FutureOr<BleDescriptor> bleDescriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName);
 
   Future<List<int>> readDescriptor({
     required String deviceId,
@@ -923,6 +912,73 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
 BleValue convertBleRawValue(BleRawValue raw, [BlePresentationFormat? f]) {
   return BleValue.unsupported(
       raw.values, raw.format?.gattFormat ?? FormatTypes.unknown);
+}
+
+/// Return descriptors for a characteristic
+@riverpod
+class BleDescriptorsFor extends _$BleDescriptorsFor {
+  @override
+  Future<List<BleDescriptor>> build({
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+  }) async {
+    final completer = Completer<List<BleDescriptor>>();
+
+    try {
+      ref.listen(
+        bleCharacteristicForProvider(
+          deviceId: deviceId,
+          deviceName: deviceName,
+          serviceUuid: serviceUuid,
+          characteristicUuid: characteristicUuid,
+        ),
+        (prev, next) {
+          next.maybeWhen(
+              data: (characteristic) async {
+                state = AsyncData(await _ble.bleDescriptorsFor(
+                    characteristicUuid, serviceUuid, deviceId, deviceName));
+              },
+              error: _fail,
+              orElse: () {});
+        },
+        fireImmediately: true,
+      );
+    } catch (e, t) {
+      _fail(e, t);
+    }
+
+    return completer.future;
+  }
+
+  _fail(error, t) {
+    state = AsyncError(
+        GetDescriptorsException(
+          deviceId: deviceId,
+          name: deviceName,
+          serviceUuid: serviceUuid,
+          characteristicUuid: characteristicUuid,
+          causedBy: error,
+        ),
+        t);
+  }
+}
+
+/// Return a descriptor
+@riverpod
+class BleDescriptorFor extends _$BleDescriptorFor {
+  @override
+  Future<BleDescriptor> build({
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+    required BleUUID descriptorUuid,
+  }) async {
+    return Future.value(_ble.bleDescriptorFor(
+        descriptorUuid, characteristicUuid, serviceUuid, deviceId, deviceName));
+  }
 }
 
 /// Return the value of a descriptor

@@ -220,14 +220,11 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
         notifyEncryptionRequired: c.properties.notifyEncryptionRequired,
         indicateEncryptionRequired: c.properties.indicateEncryptionRequired,
       ),
-      descriptors: [
-        for (final d in c.descriptors) bleDescriptorFor(d, deviceName),
-      ],
     );
   }
 
   @override
-  BleDescriptor bleDescriptorFor(
+  BleDescriptor bleDescriptorFrom(
       BluetoothDescriptor nativeDescriptor, String deviceName) {
     final d = nativeDescriptor;
     final deviceId = d.remoteId.str;
@@ -260,6 +257,58 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
           )
       ],
     );
+  }
+
+  FutureOr<List<BluetoothDescriptor>> descriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) async {
+    final nativeCharacteristic = characteristicFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+    return descriptorsFrom(await nativeCharacteristic);
+  }
+
+  @override
+  FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) async {
+    final nativeDescriptors = await descriptorsFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+    return nativeDescriptors
+        .map((d) => bleDescriptorFrom(d, deviceName))
+        .toList();
+  }
+
+  FutureOr<BluetoothDescriptor> descriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) async {
+    final descriptors = await descriptorsFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+    final descriptor =
+        descriptors.where((d) => BleUUID(d.uuid.toString()) == descriptorUuid);
+    if (descriptor.isEmpty) {
+      throw UnknownDescriptorException(
+          descriptorUuid: descriptorUuid,
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          name: deviceName);
+    }
+
+    return descriptor.first;
+  }
+
+  @override
+  FutureOr<BleDescriptor> bleDescriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) async {
+    final descriptor = await descriptorFor(
+        descriptorUuid, characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    return Future.value(bleDescriptorFrom(descriptor, deviceName));
   }
 
   /// Getting errors with multiple descriptor reads from different services

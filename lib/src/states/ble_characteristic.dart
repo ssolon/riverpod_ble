@@ -12,7 +12,6 @@ class BleCharacteristic with _$BleCharacteristic {
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
     required BleCharacteristicProperties properties,
-    required List<BleDescriptor> descriptors,
   }) = _BleCharacteristic;
 
   factory BleCharacteristic.fromJson(Map<String, dynamic> json) =>

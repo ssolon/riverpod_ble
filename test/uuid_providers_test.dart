@@ -240,7 +240,6 @@ void main() {
         notifyEncryptionRequired: false,
         indicateEncryptionRequired: false,
       ),
-      descriptors: List.empty(),
     );
     test('Custom uuid lookup', () async {
       final container = ProviderContainer();

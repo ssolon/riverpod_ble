@@ -10,6 +10,18 @@ mixin BleDeviceInfo {
   String get deviceName;
 }
 
+// Make this not one of our so it gets "foreign" error handling
+class UnsupportedByPlatformException implements Exception {
+  final String operation;
+  final String platform;
+
+  UnsupportedByPlatformException(this.operation, this.platform);
+
+  @override
+  String toString() =>
+      "Operation=$operation is not supported by platform=$platform";
+}
+
 ///  Base class for one our exceptions
 class RiverpodBleException with CausedBy implements Exception {
   @override
@@ -244,6 +256,42 @@ class ReadingCharacteristicException extends CharacteristicException {
 
   @override
   String formatBase(base) => super.formatBase("Failed to read characteristic");
+}
+
+@immutable
+class GetDescriptorsException extends RiverpodBleException with BleDeviceInfo {
+  final BleUUID characteristicUuid;
+  final BleUUID serviceUuid;
+  @override
+  final String deviceId;
+  @Deprecated('Use deviceName')
+  final String name;
+  final String? reason;
+
+  @override
+  String get deviceName => name;
+
+  const GetDescriptorsException({
+    required this.characteristicUuid,
+    required this.serviceUuid,
+    required this.deviceId,
+    required this.name,
+    this.reason,
+    super.causedBy,
+  });
+
+  @override
+  String toString() => exceptionMessage(
+        'Get Descriptors exception',
+        [
+          (n: 'reason', v: (n) => maybeUnknown(reason)),
+          (n: 'characteristicUuid', v: characteristicUuid),
+          (n: 'serviceUuid', v: serviceUuid),
+          (n: 'deviceId', v: deviceId),
+          (n: 'deviceName', v: name),
+        ],
+        [],
+      );
 }
 
 @immutable

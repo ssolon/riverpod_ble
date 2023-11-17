@@ -141,19 +141,12 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
       BleUUID serviceUuid,
       String deviceId) {
     return BleCharacteristic(
-        deviceId: deviceId,
-        deviceName: deviceName,
-        serviceUuid: serviceUuid,
-        characteristicUuid: BleUUID(nativeCharacteristic.uuid),
-        properties: _blePropertiesFromNative(nativeCharacteristic.properties),
-        descriptors: []);
-  }
-
-  @override
-  BleDescriptor bleDescriptorFor(
-      web.BluetoothDescriptor nativeDescriptor, String deviceName) {
-    // TODO: implement bleDescriptorFor
-    throw UnimplementedError();
+      deviceId: deviceId,
+      deviceName: deviceName,
+      serviceUuid: serviceUuid,
+      characteristicUuid: BleUUID(nativeCharacteristic.uuid),
+      properties: _blePropertiesFromNative(nativeCharacteristic.properties),
+    );
   }
 
   @override
@@ -290,19 +283,6 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   }
 
   @override
-  BleUUID descriptorUuidFrom(web.BluetoothDescriptor nativeDescriptor) {
-    // TODO: implement descriptorUuidFrom
-    throw UnimplementedError();
-  }
-
-  @override
-  List<web.BluetoothDescriptor> descriptorsFrom(
-      web.BluetoothCharacteristic nativeCharacteristic) {
-    // TODO: implement descriptorsFrom
-    throw UnimplementedError();
-  }
-
-  @override
   String deviceIdOf(BleWebDevice native) => native.id;
 
   @override
@@ -340,13 +320,67 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   }
 
   @override
-  Future<List<int>> readCharacteristic(
-      {required String deviceId,
-      required String deviceName,
-      required BleUUID serviceUuid,
-      required BleUUID characteristicUuid}) {
-    // TODO: implement readCharacteristic
-    throw UnimplementedError();
+  BleUUID descriptorUuidFrom(web.BluetoothDescriptor nativeDescriptor) {
+    return BleUUID(nativeDescriptor.uuid);
+  }
+
+  //@override
+  BleDescriptor bleDescriptorFrom(
+      web.BluetoothDescriptor nativeDescriptor,
+      String deviceName,
+      String deviceId,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid) {
+    return BleDescriptor(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuid,
+      descriptorUuid: BleUUID(nativeDescriptor.uuid),
+    );
+  }
+
+  @override
+  FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) async {
+    final characteristic = await characteristicFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    final descriptors = await characteristic.getDescriptors();
+
+    return List<BleDescriptor>.from(descriptors.map((d) => bleDescriptorFrom(
+        d, deviceName, deviceId, characteristicUuid, serviceUuid)));
+  }
+
+  FutureOr<web.BluetoothDescriptor> descriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) async {
+    final characteristic = await characteristicFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    return await characteristic.getDescriptor(descriptorUuid.str);
+  }
+
+  @override
+  FutureOr<BleDescriptor> bleDescriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) async {
+    final descriptor = await descriptorFor(
+      descriptorUuid,
+      characteristicUuid,
+      serviceUuid,
+      deviceId,
+      deviceName,
+    );
+
+    return bleDescriptorFrom(
+        descriptor, deviceName, deviceId, characteristicUuid, serviceUuid);
   }
 
   @override
@@ -355,9 +389,32 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
       required String name,
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid,
-      required BleUUID descriptorUuid}) {
-    // TODO: implement readDescriptor
-    throw UnimplementedError();
+      required BleUUID descriptorUuid}) async {
+    final descriptor = await descriptorFor(
+      descriptorUuid,
+      characteristicUuid,
+      serviceUuid,
+      deviceId,
+      name,
+    );
+
+    return fromByteData(await descriptor.readValue());
+  }
+
+  @override
+  Future<List<int>> readCharacteristic(
+      {required String deviceId,
+      required String deviceName,
+      required BleUUID serviceUuid,
+      required BleUUID characteristicUuid}) async {
+    final characteristic = await characteristicFor(
+      characteristicUuid,
+      serviceUuid,
+      deviceId,
+      deviceName,
+    );
+
+    return Future.value(fromByteData(await characteristic.readValue()));
   }
 
   @override
@@ -381,8 +438,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
         native.stopNotifications();
       }
 
-      return Future.value(native.value
-          .map((v) => List<int>.from(Uint8List.view(v.buffer).map((e) => e))));
+      return Future.value(native.value.map(fromByteData));
     } catch (e) {
       return Future.error(ReadingCharacteristicException(
           characteristicUuid: characteristicUuid,
@@ -392,4 +448,8 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
           causedBy: e));
     }
   }
+
+  /// Convert [ByteData] to [List<int>] which is what we always work with
+  List<int> fromByteData(ByteData v) =>
+      List<int>.from(Uint8List.view(v.buffer).map((e) => e));
 }

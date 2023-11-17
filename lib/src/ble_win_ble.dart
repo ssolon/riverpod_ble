@@ -211,14 +211,7 @@ class BleWinBle
         // reliableWrite: c.reliableWrite,
         // writableAuxiliaries: c.writableAuxiliaries,
       ),
-      descriptors: [],
     );
-  }
-
-  @override
-  BleDescriptor bleDescriptorFor(nativeDescriptor, String deviceName) {
-    // TODO: implement bleDescriptorFor
-    throw UnimplementedError("bleDescriptorFor");
   }
 
   List<BleCharacteristic> bleCharacteristicsFrom(WinBleService nativeService) {
@@ -341,16 +334,53 @@ class BleWinBle
       deviceFor(deviceId, deviceName).connectionStream;
 
   @override
+  BleDescriptor bleDescriptorFrom(nativeDescriptor, String deviceName) {
+    // TODO: implement bleDescriptorFrom
+    throw UnsupportedByPlatformException("bleDescriptorFrom", "windows");
+  }
+
+  @override
   BleUUID descriptorUuidFrom(nativeDescriptor) {
-    // TODO: implement descriptorUuidFrom
-    throw UnimplementedError("descriptorUuidFrom");
+    throw UnsupportedByPlatformException("descriptorUuidFrom", "windows");
+  }
+
+  @override
+  FutureOr<List<BleDescriptor>> descriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) {
+    throw UnsupportedByPlatformException("descriptorsFor", "windows");
+  }
+
+  @override
+  FutureOr<BleDescriptor> descriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String name) {
+    throw UnsupportedByPlatformException("descriptorFor", "windows");
+  }
+
+  @override
+  FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) {
+    throw UnsupportedByPlatformException("bleDescriptorsFor", "windows");
+  }
+
+  @override
+  FutureOr<BleDescriptor> bleDescriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) {
+    throw UnsupportedByPlatformException("bleDescriptorFor", "windows");
   }
 
   @override
   List<BleDescriptor> descriptorsFrom(
       WinBleCharacteristic nativeCharacteristic) {
     // TODO: implement descriptorsFrom
-    throw UnimplementedError("descriptorsFrom");
+    throw UnsupportedByPlatformException("descriptorsFrom", "windows");
   }
 
   @override
