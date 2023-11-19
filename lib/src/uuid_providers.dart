@@ -192,47 +192,58 @@ class NameForCharacteristic extends _$NameForCharacteristic {
           var n = data;
           // If no name, try for a descriptor name
           if (data == uuid.str) {
-            final ds = ref.listen(
-                bleDescriptorsForProvider(
-                    characteristicUuid: characteristic.characteristicUuid,
-                    serviceUuid: characteristic.serviceUuid,
-                    deviceId: characteristic.deviceId,
-                    deviceName: characteristic.deviceName), (previous, next) {
-              next.maybeWhen(
-                data: (data) {
-                  final ds = data.where(isUserDescriptor);
-                  if (ds.isNotEmpty) {
-                    final d = ds.first;
-                    try {
-                      ref.listen(
-                        bleDescriptorValueProvider(
-                          d.deviceId,
-                          characteristic.deviceName,
-                          d.serviceUuid,
-                          d.characteristicUuid,
-                          d.descriptorUuid,
-                        ),
-                        (previous, next) {
-                          next.when(
-                            data: (values) {
-                              n = String.fromCharCodes(values);
-                              state = AsyncData(n);
-                            },
-                            error: _fail,
-                            loading: () => state = const AsyncLoading(),
-                          );
-                        },
-                      );
-                    } catch (e, t) {
-                      _fail(e, t);
+            try {
+              final ds = ref.listen(
+                  bleDescriptorsForProvider(
+                      characteristicUuid: characteristic.characteristicUuid,
+                      serviceUuid: characteristic.serviceUuid,
+                      deviceId: characteristic.deviceId,
+                      deviceName: characteristic.deviceName), (previous, next) {
+                next.maybeWhen(
+                  data: (data) {
+                    final ds = data.where(isUserDescriptor);
+                    if (ds.isNotEmpty) {
+                      final d = ds.first;
+                      try {
+                        ref.listen(
+                          bleDescriptorValueProvider(
+                            d.deviceId,
+                            characteristic.deviceName,
+                            d.serviceUuid,
+                            d.characteristicUuid,
+                            d.descriptorUuid,
+                          ),
+                          (previous, next) {
+                            next.when(
+                              data: (values) {
+                                n = String.fromCharCodes(values);
+                                state = AsyncData(n);
+                              },
+                              error: _fail,
+                              loading: () => state = const AsyncLoading(),
+                            );
+                          },
+                        );
+                      } catch (e, t) {
+                        _fail(e, t);
+                      }
                     }
-                  }
-                },
-                orElse: () {
-                  //ignore
-                },
-              );
-            }, fireImmediately: true);
+                  },
+                  orElse: () {
+                    //ignore
+                  },
+                );
+              }, fireImmediately: true);
+            } catch (e) {
+              // Ignore uminplemented error since not all platforms
+              // support reading descriptors
+              if (e is UnimplementedError) {
+                // ignore it
+              } else {
+                // Let it be handled
+                rethrow;
+              }
+            }
           }
           state = AsyncData(n);
         },
