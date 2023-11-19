@@ -937,8 +937,12 @@ class BleDescriptorsFor extends _$BleDescriptorsFor {
         (prev, next) {
           next.maybeWhen(
               data: (characteristic) async {
-                state = AsyncData(await _ble.bleDescriptorsFor(
-                    characteristicUuid, serviceUuid, deviceId, deviceName));
+                try {
+                  state = AsyncData(await _ble.bleDescriptorsFor(
+                      characteristicUuid, serviceUuid, deviceId, deviceName));
+                } catch (e, t) {
+                  _fail(e, t);
+                }
               },
               error: _fail,
               orElse: () {});
