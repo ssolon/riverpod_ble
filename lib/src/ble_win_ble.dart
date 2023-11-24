@@ -425,14 +425,23 @@ class BleWinBle
   }
 
   @override
-  Future<List<int>> writeCharacteristic(
+  Future<void> writeCharacteristic(
       {required String deviceId,
       required String deviceName,
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid,
-      required List<int> value}) {
-    // TODO: implement writeCharacteristic
-    throw UnimplementedError();
+      required List<int> value}) async {
+    final data = Uint8List.fromList(value);
+
+    await win.WinBle.write(
+      address: deviceId,
+      service: serviceUuid.str,
+      characteristic: characteristicUuid.str,
+      writeWithResponse: true,
+      data: data,
+    );
+
+    return Future.value();
   }
 
   @override
