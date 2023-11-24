@@ -425,6 +425,17 @@ class BleWinBle
   }
 
   @override
+  Future<List<int>> writeCharacteristic(
+      {required String deviceId,
+      required String deviceName,
+      required BleUUID serviceUuid,
+      required BleUUID characteristicUuid,
+      required List<int> value}) {
+    // TODO: implement writeCharacteristic
+    throw UnimplementedError();
+  }
+
+  @override
   Future<List<int>> readDescriptor(
       {required String deviceId,
       required String name,

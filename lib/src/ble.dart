@@ -228,6 +228,14 @@ abstract class Ble<T, S, C, D> {
     required BleUUID characteristicUuid,
   });
 
+  Future<void> writeCharacteristic({
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+    required List<int> value,
+  });
+
   Future<Stream<List<int>>> setNotifyCharacteristic({
     required bool notify,
     required String deviceId,
@@ -748,6 +756,15 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
       state = AsyncError(_fail(e), t);
     }
     return completer.future;
+  }
+
+  Future<void> write(List<int> value) {
+    return _ble.writeCharacteristic(
+        deviceId: deviceId,
+        deviceName: deviceName,
+        serviceUuid: serviceUuid,
+        characteristicUuid: characteristicUuid,
+        value: value);
   }
 
   _fail(e) => CharacteristicException(

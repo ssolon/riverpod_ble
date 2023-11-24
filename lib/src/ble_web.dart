@@ -418,6 +418,26 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   }
 
   @override
+  Future<void> writeCharacteristic(
+      {required String deviceId,
+      required String deviceName,
+      required BleUUID serviceUuid,
+      required BleUUID characteristicUuid,
+      required List<int> value}) async {
+    final characteristic = await characteristicFor(
+      characteristicUuid,
+      serviceUuid,
+      deviceId,
+      deviceName,
+    );
+
+    final uint8list = toUint8List(value);
+    // Attempts to use writeValueWithoutResponse didn't seem to do anything
+    final result = await characteristic.writeValueWithResponse(uint8list);
+    return result;
+  }
+
+  @override
   Future<Stream<List<int>>> setNotifyCharacteristic(
       {required bool notify,
       required String deviceId,
@@ -452,4 +472,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
   /// Convert [ByteData] to [List<int>] which is what we always work with
   List<int> fromByteData(ByteData v) =>
       List<int>.from(Uint8List.view(v.buffer).map((e) => e));
+
+  /// Convert [List<int>] to [ByteData] which is what we always work with
+  Uint8List toUint8List(List<int> v) => Uint8List.fromList(v);
 }

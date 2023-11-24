@@ -385,6 +385,30 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   }
 
   @override
+  Future<void> writeCharacteristic({
+    required String deviceId,
+    required String deviceName,
+    required BleUUID serviceUuid,
+    required BleUUID characteristicUuid,
+    required List<int> value,
+  }) async {
+    try {
+      final characteristic = await characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+      characteristic.write(value);
+    } catch (e) {
+      return Future.error(CharacteristicException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        causedBy: e,
+        reason: "Write characteristic",
+      ));
+    }
+  }
+
+  @override
   Future<Stream<List<int>>> setNotifyCharacteristic({
     required bool notify,
     required String deviceId,
