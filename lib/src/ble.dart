@@ -790,21 +790,14 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
 
     try {
       ref.listen(
-        bleServicesForProvider(deviceId, deviceName),
-        (previous, next) {
-          next.when(
-            data: (services) async {
-              _logger.finest('bleCharacteristicValue: got services?');
-              final s = services.where((e) => e.serviceUuid == serviceUuid);
-
-              if (s.isEmpty) {
-                throw UnknownService(
-                  serviceUuid,
-                  deviceId,
-                  deviceName,
-                  reason: "Reading characteristic $characteristicUuid",
-                );
-              }
+          bleCharacteristicForProvider(
+              characteristicUuid: characteristicUuid,
+              serviceUuid: serviceUuid,
+              deviceId: deviceId,
+              deviceName: deviceName), (previous, next) {
+        next.maybeWhen(
+          data: (characteristic) async {
+            try {
               final value = await _ble.readCharacteristic(
                 deviceId: deviceId,
                 deviceName: deviceName,
@@ -812,17 +805,16 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
                 characteristicUuid: characteristicUuid,
               );
               state = AsyncData(BleRawValue(values: value));
-            },
-            error: _fail,
-            loading: () {
-              // ignore
-            },
-          );
-        },
-        fireImmediately: true,
-      );
+            } catch (e, t) {
+              _fail(e, t);
+            }
+          },
+          error: _fail,
+          orElse: () {},
+        );
+      }, fireImmediately: true);
     } catch (e, t) {
-      state = _fail(e, t);
+      _fail(e, t);
     }
     return completer.future;
   }
@@ -1032,13 +1024,40 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                   throw UnknownService(serviceUuid, deviceId, deviceName,
                       reason: "Reading descriptor $descriptorUuid");
                 }
-                final value = await _ble.readDescriptor(
-                    deviceId: deviceId,
-                    name: deviceName,
-                    serviceUuid: serviceUuid,
-                    characteristicUuid: characteristicUuid,
-                    descriptorUuid: descriptorUuid);
-                state = AsyncData(value);
+
+                // Some platforms may require explicit access to characteristics
+                // to make sure they're loaded
+                try {
+                  ref.listen(
+                      bleCharacteristicForProvider(
+                        characteristicUuid: characteristicUuid,
+                        serviceUuid: serviceUuid,
+                        deviceId: deviceId,
+                        deviceName: deviceName,
+                      ), (previous, next) {
+                    next.maybeWhen(
+                      data: (characteristic) async {
+                        try {
+                          final value = await _ble.readDescriptor(
+                              deviceId: deviceId,
+                              name: deviceName,
+                              serviceUuid: serviceUuid,
+                              characteristicUuid: characteristicUuid,
+                              descriptorUuid: descriptorUuid);
+                          state = AsyncData(value);
+                        } catch (e, t) {
+                          state = _fail(e, t);
+                        }
+                      },
+                      error: (e, t) {
+                        state = _fail(e, t);
+                      },
+                      orElse: () {},
+                    );
+                  }, fireImmediately: true);
+                } catch (e, t) {
+                  state = _fail(e, t);
+                }
               } catch (e, t) {
                 state = _fail(e, t);
               }
