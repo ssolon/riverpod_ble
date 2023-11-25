@@ -237,7 +237,7 @@ mixin CausedBy {
   /// Format [causedBy]
   ///
   /// Default returns '' if null and 'causedBy: causedby.toString().
-  String formatCausedBy() => causedBy == null ? '' : "causedBy: $causedBy";
+  String formatCausedBy() => causedBy == null ? '' : "causedBy: {$causedBy}";
 
   /// Format the var item [def].
   ///
