@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:logging/logging.dart';
+import 'package:mutex/mutex.dart';
 import 'package:win_ble/win_ble.dart' as win;
 import 'package:win_ble/win_file.dart';
 
@@ -90,6 +91,12 @@ class BleWinBle
 
   /// Stream subscription with connection status messages
   late final StreamSubscription? _connectionStatusStreamSubscription;
+
+  /// Seeing problems that may be multiple access to characteristics so
+  /// use a mute to control access
+  /// Start with restricting both read and write
+  final servicesAccessMutex = Mutex();
+  final characteristicsAccessMutex = Mutex();
 
   @override
   Future<void> initialize() async {
@@ -240,41 +247,43 @@ class BleWinBle
       BleUUID serviceUuid, String deviceId, String name) async {
     final service = await serviceFor(serviceUuid, deviceId, name);
 
-    if (service.characteristics == null || service.characteristics!.isEmpty) {
-      final nativeCharacteristics = await win.WinBle.discoverCharacteristics(
-          address: deviceId, serviceId: serviceUuid.str);
+    await characteristicsAccessMutex.protect(() async {
+      if (service.characteristics == null || service.characteristics!.isEmpty) {
+        final nativeCharacteristics = await win.WinBle.discoverCharacteristics(
+            address: deviceId, serviceId: serviceUuid.str);
 
-      logger.finest(
-          "characteristicsFor: service=$serviceUuid results=${nativeCharacteristics.length}");
+        logger.finest(
+            "characteristicsFor: service=$serviceUuid results=${nativeCharacteristics.length}");
 
-      service.characteristics = nativeCharacteristics
-          .map((c) => WinBleCharacteristic(
-                deviceId: deviceId,
-                deviceName: name,
-                serviceUuid: serviceUuid,
-                characteristicUuid: BleUUID(c.uuid),
-                properties: BleCharacteristicProperties(
-                  broadcast: c.properties.broadcast ?? false,
-                  read: c.properties.read ?? false,
-                  writeWithoutResponse:
-                      c.properties.writeWithoutResponse ?? false,
-                  write: c.properties.write ?? false,
-                  notify: c.properties.notify ?? false,
-                  indicate: c.properties.indicate ?? false,
-                  authenticatedSignedWrites:
-                      c.properties.authenticatedSignedWrites ?? false,
-                  extendedProperties: false,
-                  notifyEncryptionRequired: false,
-                  indicateEncryptionRequired: false,
-                  // TODO Support these?
-                  // reliableWrite: c.reliableWrite,
-                  // writableAuxiliaries: c.writableAuxiliaries,
-                ),
-              ))
-          .toList();
+        service.characteristics = nativeCharacteristics
+            .map((c) => WinBleCharacteristic(
+                  deviceId: deviceId,
+                  deviceName: name,
+                  serviceUuid: serviceUuid,
+                  characteristicUuid: BleUUID(c.uuid),
+                  properties: BleCharacteristicProperties(
+                    broadcast: c.properties.broadcast ?? false,
+                    read: c.properties.read ?? false,
+                    writeWithoutResponse:
+                        c.properties.writeWithoutResponse ?? false,
+                    write: c.properties.write ?? false,
+                    notify: c.properties.notify ?? false,
+                    indicate: c.properties.indicate ?? false,
+                    authenticatedSignedWrites:
+                        c.properties.authenticatedSignedWrites ?? false,
+                    extendedProperties: false,
+                    notifyEncryptionRequired: false,
+                    indicateEncryptionRequired: false,
+                    // TODO Support these?
+                    // reliableWrite: c.reliableWrite,
+                    // writableAuxiliaries: c.writableAuxiliaries,
+                  ),
+                ))
+            .toList();
 
-      logger.finest("characteristicsFor: added");
-    }
+        logger.finest("characteristicsFor: added");
+      }
+    });
 
     return Future.value(service.characteristics);
   }
@@ -462,11 +471,13 @@ class BleWinBle
   Future<List<WinBleService>> servicesFor(String deviceId, String name) async {
     final device = deviceFor(deviceId, name);
 
-    device.services ??= (await win.WinBle.discoverServices(deviceId))
-        .map(
-          (e) => WinBleService(deviceId, name, BleUUID(e)),
-        )
-        .toList();
+    await servicesAccessMutex.protect(() async {
+      device.services ??= (await win.WinBle.discoverServices(deviceId))
+          .map(
+            (e) => WinBleService(deviceId, name, BleUUID(e)),
+          )
+          .toList();
+    });
 
     return Future.value(device.services);
   }
