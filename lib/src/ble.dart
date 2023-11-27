@@ -282,6 +282,14 @@ abstract class Ble<T, S, C, D> {
 bool scannerNeedsServiceUuids(ScannerNeedsServiceUuidsRef ref) =>
     _ble.scannerNeedsServiceUuids;
 
+/// Similar to [scannerNeedsServiceUuids] some backends (e.g. web) for
+/// security reasons, require that the uuids of the service that will be
+/// accessed be provided when connecting to a device.
+/// TODO Enforce this in connection?
+@riverpod
+bool connectionRequiresServiceUuids(ConnectionRequiresServiceUuidsRef ref) =>
+    _ble.connectionRequiresServiceUuids;
+
 /// Scanner for BLE devices.
 ///
 /// Notifies with [BleScanResult] object which can contain either a list of
