@@ -351,7 +351,8 @@ class BleScanner extends _$BleScanner {
   }
 
   /// (Re)start scanning
-  void start(List<BleUUID>? withServices) {
+  void start(List<BleUUID>? withServices,
+      {Duration timeout = const Duration(seconds: 30)}) {
     _logger.info("Start scanning...");
     stop();
 
@@ -363,7 +364,7 @@ class BleScanner extends _$BleScanner {
       _logger.severe("BleScanner: Error=$error");
     });
 
-    _ble.startScan(withServices: withServices);
+    _ble.startScan(withServices: withServices, timeout: timeout);
   }
 
   /// Stop scanning
