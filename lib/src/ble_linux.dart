@@ -124,10 +124,12 @@ class LinuxBle
           .add(devices.toList() as List<BleScannedDevice>);
     });
 
-    _scanTimeoutTimer = Timer(timeout, () {
-      _log.finer('Scan timeout');
-      _adapter?.stopDiscovery();
-    });
+    if (timeout.inSeconds > 0) {
+      _scanTimeoutTimer = Timer(timeout, () {
+        _log.finer('Scan timeout');
+        _adapter?.stopDiscovery();
+      });
+    }
 
     _adapter?.setDiscoveryFilter(
         uuids: withServices?.map((e) => e.toString()).toList());
