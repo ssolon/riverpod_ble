@@ -50,6 +50,48 @@ class BleInitializationError extends RiverpodBleException {
 }
 
 @immutable
+class BleBluetoothNotAvailableException extends RiverpodBleException {
+  final String? reason;
+  const BleBluetoothNotAvailableException({this.reason, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        "Bluetooth not available",
+        [
+          (n: 'reason', v: maybeUnknown(reason)),
+        ],
+        [],
+      );
+}
+
+@immutable
+class BleBluetoothNoAdapter extends BleBluetoothNotAvailableException {
+  final String? reason;
+  const BleBluetoothNoAdapter({this.reason, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        "Bluetooth adapter not available",
+        [
+          (n: 'reason', v: maybeUnknown(reason)),
+        ],
+        [],
+      );
+}
+
+@immutable
+class BleBluetoothAdapterNotPowered extends BleBluetoothNotAvailableException {
+  const BleBluetoothAdapterNotPowered({super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        "Bluetooth adapter not powered",
+        [],
+        [],
+      );
+}
+
+@immutable
 class BleConnectionException extends RiverpodBleException with BleDeviceInfo {
   @override
   final String deviceId;
