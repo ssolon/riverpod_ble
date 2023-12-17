@@ -41,7 +41,7 @@ defaultLogRecord(LogRecord record) =>
         "${logItem('error', record.error)}"
         "${logItem('stackTrace', record.stackTrace)}");
 
-void riverpodBleInit({
+Future<void> riverpodBleInit({
   Backend? backend,
   void Function(LogRecord) logRecord = defaultLogRecord,
   Level rootLoggingLevel = Level.ALL,
@@ -448,7 +448,7 @@ class Initialization extends _$Initialization {
       _bluetoothStateSubscription.cancel();
     });
 
-    _ble.initialize();
+    await _ble.initialize();
 
     return _completer.future;
   }
