@@ -21,3 +21,11 @@ class BleScanResults with _$BleScanResults {
   factory BleScanResults.scanStarted() = ScanStarted;
   factory BleScanResults.scanDone() = ScanDone;
 }
+
+// Convenience method to get the deviceId from a BleScannedDevice
+String? scannedDeviceIdOf(BleScannedDevice device) {
+  return device.device.mapOrNull(
+    (value) => value.deviceId,
+    scanned: (value) => value.deviceId,
+  );
+}
