@@ -129,6 +129,9 @@ class LinuxBle
       _adapter?.stopDiscovery();
     });
 
+    _adapter?.setDiscoveryFilter(
+        uuids: withServices?.map((e) => e.toString()).toList());
+
     _adapter?.startDiscovery();
   }
 
