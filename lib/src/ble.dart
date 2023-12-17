@@ -16,6 +16,7 @@ enum Backend {
   flutterBluePlus,
   winBle,
   webBle,
+  linuxBle,
 }
 
 /// States that Bluetooth controller can be in
