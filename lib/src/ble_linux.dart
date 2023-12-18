@@ -177,7 +177,7 @@ class LinuxBle
   BleCharacteristic bleCharacteristicFrom(nativeCharacteristic,
       String deviceName, BleUUID serviceUuid, String deviceId) {
     // TODO: implement bleCharacteristicFrom
-    throw UnimplementedError();
+    throw UnimplementedError("bleCharacteristicFrom");
   }
 
   @override
@@ -210,20 +210,20 @@ class LinuxBle
   @override
   Future<List<BleDevice>> connectedDevices() {
     // TODO: implement connectedDevices
-    throw UnimplementedError();
+    throw UnimplementedError("connectedDevices");
   }
 
   @override
   FutureOr<BleConnectionState> connectionStatusOf(native) {
     // TODO: implement connectionStatusOf
-    throw UnimplementedError();
+    throw UnimplementedError("connectionStatusOf");
   }
 
   @override
   Stream<BleConnectionState> connectionStreamFor(
       String deviceId, String deviceName) {
     // TODO: implement connectionStreamFor
-    throw UnimplementedError();
+    throw UnimplementedError("connectionStreamFor");
   }
 
   @override
@@ -234,46 +234,46 @@ class LinuxBle
       String deviceId,
       String deviceName) {
     // TODO: implement bleDescriptorFor
-    throw UnimplementedError();
+    throw UnimplementedError("bleDescriptorFor");
   }
 
   @override
   FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
       BleUUID serviceUuid, String deviceId, String deviceName) {
     // TODO: implement bleDescriptorsFor
-    throw UnimplementedError();
+    throw UnimplementedError("bleDescriptorsFor");
   }
 
   @override
   FutureOr<BleService> bleServiceFrom(
       nativeService, String deviceId, String deviceName) {
     // TODO: implement bleServiceFrom
-    throw UnimplementedError();
+    throw UnimplementedError("bleServiceFrom");
   }
 
   @override
   Future<List<BleService>> bleServicesFor(String deviceId, String name) {
     // TODO: implement bleServicesFor
-    throw UnimplementedError();
+    throw UnimplementedError("bleServicesFor");
   }
 
   @override
   BleUUID characteristicUuidFrom(nativeCharacteristic) {
     // TODO: implement characteristicUuidFrom
-    throw UnimplementedError();
+    throw UnimplementedError("characteristicUuidFrom");
   }
 
   @override
   Future<List<BleService>> characteristicsFor(
       BleUUID serviceUuid, String deviceId, String name) {
     // TODO: implement characteristicsFor
-    throw UnimplementedError();
+    throw UnimplementedError("characteristicsFor");
   }
 
   @override
   BleUUID descriptorUuidFrom(nativeDescriptor) {
     // TODO: implement descriptorUuidFrom
-    throw UnimplementedError();
+    throw UnimplementedError("descriptorUuidFrom");
   }
 
   @override
@@ -284,31 +284,31 @@ class LinuxBle
   @override
   Future<void> disconnectFrom(String deviceId, String deviceName) {
     // TODO: implement disconnectFrom
-    throw UnimplementedError();
+    throw UnimplementedError("disconnectFrom");
   }
 
   @override
   String exceptionDisplayMessage(Object o) {
     // TODO: implement exceptionDisplayMessage
-    throw UnimplementedError();
+    throw UnimplementedError("exceptionDisplayMessage");
   }
 
   @override
   FutureOr<bool> isConnected(String deviceId, String deviceName) {
     // TODO: implement isConnected
-    throw UnimplementedError();
+    throw UnimplementedError("isConnected");
   }
 
   @override
   String nameOf(native) {
     // TODO: implement nameOf
-    throw UnimplementedError();
+    throw UnimplementedError("nameOf");
   }
 
   @override
   nativeFrom({required String deviceId, required String name}) {
     // TODO: implement nativeFrom
-    throw UnimplementedError();
+    throw UnimplementedError("nativeFrom");
   }
 
   @override
@@ -318,7 +318,7 @@ class LinuxBle
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid}) {
     // TODO: implement readCharacteristic
-    throw UnimplementedError();
+    throw UnimplementedError("readCharacteristic");
   }
 
   @override
@@ -329,25 +329,25 @@ class LinuxBle
       required BleUUID characteristicUuid,
       required BleUUID descriptorUuid}) {
     // TODO: implement readDescriptor
-    throw UnimplementedError();
+    throw UnimplementedError("readDescriptor");
   }
 
   @override
   BleUUID serviceUuidFrom(nativeService) {
     // TODO: implement serviceUuidFrom
-    throw UnimplementedError();
+    throw UnimplementedError("serviceUuidFrom");
   }
 
   @override
   Future<List<BleCharacteristic>> servicesFor(String deviceId, String name) {
     // TODO: implement servicesFor
-    throw UnimplementedError();
+    throw UnimplementedError("servicesFor");
   }
 
   @override
   Future<List<BleCharacteristic>> servicesFrom(native) {
     // TODO: implement servicesFrom
-    throw UnimplementedError();
+    throw UnimplementedError("servicesFrom");
   }
 
   @override
@@ -358,7 +358,7 @@ class LinuxBle
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid}) {
     // TODO: implement setNotifyCharacteristic
-    throw UnimplementedError();
+    throw UnimplementedError("setNotifyCharacteristic");
   }
 
   @override
@@ -369,6 +369,6 @@ class LinuxBle
       required BleUUID characteristicUuid,
       required List<int> value}) {
     // TODO: implement writeCharacteristic
-    throw UnimplementedError();
+    throw UnimplementedError("writeCharacteristic");
   }
 }
