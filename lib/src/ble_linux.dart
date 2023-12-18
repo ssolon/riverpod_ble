@@ -214,6 +214,12 @@ class LinuxBle
   }
 
   @override
+  FutureOr<bool> isConnected(String deviceId, String deviceName) {
+    final nativeDevice = device(deviceId);
+    return nativeDevice?.connected ?? false;
+  }
+
+  @override
   FutureOr<BleConnectionState> connectionStatusOf(native) {
     // TODO: implement connectionStatusOf
     throw UnimplementedError("connectionStatusOf");
@@ -224,6 +230,12 @@ class LinuxBle
       String deviceId, String deviceName) {
     // TODO: implement connectionStreamFor
     throw UnimplementedError("connectionStreamFor");
+  }
+
+  @override
+  Future<void> disconnectFrom(String deviceId, String deviceName) async {
+    final nativeDevice = device(deviceId);
+    await nativeDevice?.disconnect();
   }
 
   @override
@@ -282,27 +294,14 @@ class LinuxBle
   }
 
   @override
-  Future<void> disconnectFrom(String deviceId, String deviceName) {
-    // TODO: implement disconnectFrom
-    throw UnimplementedError("disconnectFrom");
+  String nameOf(native) {
+    return native.name;
   }
 
   @override
   String exceptionDisplayMessage(Object o) {
     // TODO: implement exceptionDisplayMessage
     throw UnimplementedError("exceptionDisplayMessage");
-  }
-
-  @override
-  FutureOr<bool> isConnected(String deviceId, String deviceName) {
-    // TODO: implement isConnected
-    throw UnimplementedError("isConnected");
-  }
-
-  @override
-  String nameOf(native) {
-    // TODO: implement nameOf
-    throw UnimplementedError("nameOf");
   }
 
   @override
