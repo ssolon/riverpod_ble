@@ -142,6 +142,7 @@ class LinuxBle
       BleDevice.scanned(
         deviceId: device.address,
         name: device.name,
+        services: device.uuids.map((e) => BleUUID(e.toString())).toList(),
       ),
       device.rssi,
       DateTime.now(),
