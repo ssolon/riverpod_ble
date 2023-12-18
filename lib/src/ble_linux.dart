@@ -138,6 +138,11 @@ class LinuxBle
   }
 
   BleScannedDevice _scannedDeviceFrom(BlueZDevice device) {
+    // Create native device entry since we'll want to use it later
+    // to connect.
+
+    register(device);
+
     return BleScannedDevice(
       BleDevice.scanned(
         deviceId: device.address,
@@ -172,6 +177,52 @@ class LinuxBle
   BleCharacteristic bleCharacteristicFrom(nativeCharacteristic,
       String deviceName, BleUUID serviceUuid, String deviceId) {
     // TODO: implement bleCharacteristicFrom
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<BleDevice> connectTo(String deviceId, String deviceName,
+      [List<String> services = const <String>[]]) async {
+    final nativeDevice = device(deviceId);
+    if (nativeDevice == null) {
+      throw UnimplementedError(
+          "Connecting to unscanned device not supported yet");
+    }
+
+    try {
+      await nativeDevice.connect();
+
+      return BleDevice(
+        deviceId: deviceId,
+        name: deviceName,
+        nativeDevice: nativeDevice,
+        services: nativeDevice.gattServices
+            .map((e) => BleUUID(e.uuid.toString()))
+            .toList(),
+        status: BleConnectionState.connected(),
+      );
+    } catch (e) {
+      throw BleConnectionException(deviceId, deviceName, "Could not connect",
+          causedBy: e);
+    }
+  }
+
+  @override
+  Future<List<BleDevice>> connectedDevices() {
+    // TODO: implement connectedDevices
+    throw UnimplementedError();
+  }
+
+  @override
+  FutureOr<BleConnectionState> connectionStatusOf(native) {
+    // TODO: implement connectionStatusOf
+    throw UnimplementedError();
+  }
+
+  @override
+  Stream<BleConnectionState> connectionStreamFor(
+      String deviceId, String deviceName) {
+    // TODO: implement connectionStreamFor
     throw UnimplementedError();
   }
 
@@ -220,32 +271,6 @@ class LinuxBle
   }
 
   @override
-  Future<BleDevice> connectTo(String deviceId, String deviceName,
-      [List<String> services = const <String>[]]) {
-    // TODO: implement connectTo
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<List<BleDevice>> connectedDevices() {
-    // TODO: implement connectedDevices
-    throw UnimplementedError();
-  }
-
-  @override
-  FutureOr<BleConnectionState> connectionStatusOf(native) {
-    // TODO: implement connectionStatusOf
-    throw UnimplementedError();
-  }
-
-  @override
-  Stream<BleConnectionState> connectionStreamFor(
-      String deviceId, String deviceName) {
-    // TODO: implement connectionStreamFor
-    throw UnimplementedError();
-  }
-
-  @override
   BleUUID descriptorUuidFrom(nativeDescriptor) {
     // TODO: implement descriptorUuidFrom
     throw UnimplementedError();
@@ -253,8 +278,7 @@ class LinuxBle
 
   @override
   String deviceIdOf(native) {
-    // TODO: implement deviceIdOf
-    throw UnimplementedError();
+    return native.address;
   }
 
   @override
