@@ -38,7 +38,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
       {Duration timeout = const Duration(seconds: 30),
       List<BleUUID>? withServices}) {
     final guids = withServices?.map((e) => Guid(e.str)).toList() ?? [];
-    FlutterBluePlus.startScan(timeout: timeout, withServices: guids);
+    FlutterBluePlus.startScan(
+        timeout: timeout.inSeconds == 0 ? null : timeout, withServices: guids);
   }
 
   @override
@@ -54,6 +55,18 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   Stream<List<BleScannedDevice>> get scannerResults =>
       FlutterBluePlus.scanResults.map(
         (results) => results.map((r) {
+          _logger.finest("Scanned device ${r.device.platformName}"
+              " address=${r.device.remoteId.str}"
+              " advName=${r.advertisementData.advName}"
+              " platformName=${r.device.platformName}");
+          r.advertisementData.manufacturerData.forEach((key, value) {
+            _logger.finest("  manufacturerData: ${key.toRadixString(16)}"
+                "=${value.map((e) => e.toRadixString(16)).join(" ")}");
+          });
+          r.advertisementData.serviceData.forEach((key, value) {
+            _logger.finest("  serviceData: $key"
+                "=${value.map((e) => e.toRadixString(16)).join(" ")}");
+          });
           register(r.device);
           return BleScannedDevice(
               BleDevice.scanned(
@@ -62,6 +75,9 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
                 services: r.advertisementData.serviceUuids
                     .map((e) => BleUUID(e.uuid128))
                     .toList(),
+                manufacturerData: r.advertisementData.manufacturerData,
+                serviceData: r.advertisementData.serviceData.map(
+                    (key, value) => MapEntry(BleUUID(key.toString()), value)),
               ),
               r.rssi,
               r.timeStamp,

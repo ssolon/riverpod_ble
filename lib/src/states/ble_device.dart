@@ -14,6 +14,8 @@ class BleDevice<T> with _$BleDevice {
     required String deviceId,
     required String name,
     @Default([]) List<BleUUID> services,
+    Map<int, List<int>>? manufacturerData,
+    Map<BleUUID, List<int>>? serviceData,
   }) = Scanned;
 
   factory BleDevice({
@@ -21,6 +23,8 @@ class BleDevice<T> with _$BleDevice {
     required String name,
     required T nativeDevice,
     @Default([]) List<BleUUID> services,
+    Map<int, List<int>>? manufacturerData,
+    Map<BleUUID, List<int>>? serviceData,
     required BleConnectionState status,
   }) = _BleDevice;
 
