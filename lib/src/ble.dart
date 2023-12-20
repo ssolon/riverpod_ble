@@ -1124,13 +1124,16 @@ FutureOr<bool?> bleIsConnectedFromException(Exception e) async {
 Future<String> bleExceptionDisplayMessage(Object e) async {
   if (e is Exception) {
     final root = CausedBy.rootCause(e);
-    if (e is RiverpodBleException) {
+
+    if (root is RiverpodBleException) {
       // If we're not connected -- nothing else matters so check that first
       final maybeConnected = await bleIsConnectedFromException(e);
       if (maybeConnected != null && !maybeConnected) {
         return "Device is not connected";
       }
+    }
 
+    if (e is RiverpodBleException) {
       // Show cause if it's different using platform specfic code if it's
       // not one of our exceptions.
 
