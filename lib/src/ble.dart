@@ -45,7 +45,7 @@ defaultLogRecord(LogRecord record) =>
 Future<void> riverpodBleInit({
   Backend? backend,
   void Function(LogRecord) logRecord = defaultLogRecord,
-  Level rootLoggingLevel = Level.ALL,
+  Level rootLoggingLevel = Level.FINER,
 }) async {
   Logger.root.onRecord.listen(logRecord);
   Logger.root.level = rootLoggingLevel;
