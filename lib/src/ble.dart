@@ -534,9 +534,18 @@ class BleConnection extends _$BleConnection {
     }
   }
 
-  disconnect() {
+  Future<void> disconnect() async {
     _logger.fine("BleConnection: disconnect from $deviceName/$deviceId");
-    _ble.disconnectFrom(deviceId, deviceName);
+    try {
+      _ble.disconnectFrom(deviceId, deviceName);
+    } catch (e) {
+      _logger.warning("BleConnection: disconnect error $e");
+
+      Future.error(e is BleConnectionException
+          ? e
+          : BleConnectionException(deviceId, deviceName, 'Disconnecting',
+              causedBy: e));
+    }
   }
 }
 

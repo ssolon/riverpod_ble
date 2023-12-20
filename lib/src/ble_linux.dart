@@ -253,7 +253,14 @@ class LinuxBle
   @override
   Future<void> disconnectFrom(String deviceId, String deviceName) async {
     final nativeDevice = device(deviceId);
-    await nativeDevice?.disconnect();
+
+    try {
+      await nativeDevice?.disconnect();
+    } catch (e) {
+      return Future.error(BleConnectionException(
+          deviceId, deviceName, "Could not disconnect",
+          causedBy: e));
+    }
   }
 
   @override
