@@ -143,10 +143,28 @@ class LinuxBle
 
     register(device);
 
+    _log.finest("Scanned device ${device.name}"
+        " address=${device.address}"
+        " alias=${device.alias}");
+
+    device.manufacturerData.forEach((key, value) {
+      _log.finest("  manufacturerData: ${key.id.toRadixString(16)}"
+          "=${value.map((e) => e.toRadixString(16)).join(" ")}");
+    });
+
+    device.serviceData.forEach((key, value) {
+      _log.finest("  serviceData: $key"
+          "=${value.map((e) => e.toRadixString(16)).join(" ")}");
+    });
+
     return BleScannedDevice(
       BleDevice.scanned(
         deviceId: device.address,
         name: device.name,
+        manufacturerData: device.manufacturerData
+            .map((key, value) => MapEntry(key.id, value)),
+        serviceData: device.serviceData
+            .map((key, value) => MapEntry(BleUUID(key.toString()), value)),
         services: device.uuids.map((e) => BleUUID(e.toString())).toList(),
       ),
       device.rssi,
