@@ -325,8 +325,7 @@ class LinuxBle
 
   @override
   String exceptionDisplayMessage(Object o) {
-    // TODO: implement exceptionDisplayMessage
-    throw UnimplementedError("exceptionDisplayMessage");
+    return (o is BlueZException) ? o.message : o.toString();
   }
 
   @override
