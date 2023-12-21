@@ -246,8 +246,24 @@ class LinuxBle
   @override
   Stream<BleConnectionState> connectionStreamFor(
       String deviceId, String deviceName) {
-    // TODO: implement connectionStreamFor
-    throw UnimplementedError("connectionStreamFor");
+    final nativeDevice = device(deviceId);
+    if (nativeDevice != null) {
+      return nativeDevice.propertiesChanged.expand((properties) {
+        List<BleConnectionState> states = [];
+
+        for (final property in properties) {
+          if (property == "Connected") {
+            states.add(nativeDevice.connected
+                ? BleConnectionState.connected()
+                : BleConnectionState.disconnected());
+          }
+        }
+
+        return states;
+      });
+    } else {
+      return const Stream<BleConnectionState>.empty();
+    }
   }
 
   @override
