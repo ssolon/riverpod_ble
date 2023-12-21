@@ -9,8 +9,8 @@ import '../riverpod_ble.dart';
 
 final _log = Logger('BleLinux');
 
-class LinuxBle
-    extends Ble<BlueZDevice, BleCharacteristic, BleService, BleDescriptor> {
+class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
+    BlueZGattCharacteristic, BlueZGattDescriptor> {
   BlueZClient? _client;
   BlueZAdapter? _adapter;
 
@@ -298,26 +298,13 @@ class LinuxBle
   }
 
   @override
-  FutureOr<BleService> bleServiceFrom(
-      nativeService, String deviceId, String deviceName) {
-    // TODO: implement bleServiceFrom
-    throw UnimplementedError("bleServiceFrom");
-  }
-
-  @override
-  Future<List<BleService>> bleServicesFor(String deviceId, String name) {
-    // TODO: implement bleServicesFor
-    throw UnimplementedError("bleServicesFor");
-  }
-
-  @override
   BleUUID characteristicUuidFrom(nativeCharacteristic) {
     // TODO: implement characteristicUuidFrom
     throw UnimplementedError("characteristicUuidFrom");
   }
 
   @override
-  Future<List<BleService>> characteristicsFor(
+  Future<List<BlueZGattCharacteristic>> characteristicsFor(
       BleUUID serviceUuid, String deviceId, String name) {
     // TODO: implement characteristicsFor
     throw UnimplementedError("characteristicsFor");
@@ -373,20 +360,51 @@ class LinuxBle
 
   @override
   BleUUID serviceUuidFrom(nativeService) {
-    // TODO: implement serviceUuidFrom
-    throw UnimplementedError("serviceUuidFrom");
+    return BleUUID(nativeService.uuid.toString());
   }
 
   @override
-  Future<List<BleCharacteristic>> servicesFor(String deviceId, String name) {
-    // TODO: implement servicesFor
-    throw UnimplementedError("servicesFor");
+  Future<List<BlueZGattService>> servicesFor(String deviceId, String name) {
+    final nativeDevice = device(deviceId);
+    if (nativeDevice != null) {
+      return servicesFrom(nativeDevice);
+    } else {
+      return Future.value([]);
+    }
   }
 
   @override
-  Future<List<BleCharacteristic>> servicesFrom(native) {
-    // TODO: implement servicesFrom
-    throw UnimplementedError("servicesFrom");
+  Future<List<BlueZGattService>> servicesFrom(native) {
+    return Future.value(native.gattServices);
+  }
+
+  @override
+  FutureOr<BleService> bleServiceFrom(
+      nativeService, String deviceId, String deviceName) {
+    return BleService(
+      deviceId,
+      deviceName,
+      BleUUID(nativeService.uuid.toString()),
+      [],
+      isPrimary: nativeService.primary,
+    );
+  }
+
+  @override
+  Future<List<BleService>> bleServicesFor(String deviceId, String name) async {
+    try {
+      final nativeServices = await servicesFor(deviceId, name);
+
+      final result = <BleService>[
+        for (final s in nativeServices) await bleServiceFrom(s, deviceId, name)
+      ];
+
+      return Future.value(result);
+    } catch (e) {
+      return Future.error(BleConnectionException(
+          deviceId, name, "Could not get services",
+          causedBy: e));
+    }
   }
 
   @override
