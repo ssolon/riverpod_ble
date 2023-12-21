@@ -192,13 +192,6 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
       _scannerResultsStreamController.stream;
 
   @override
-  BleCharacteristic bleCharacteristicFrom(nativeCharacteristic,
-      String deviceName, BleUUID serviceUuid, String deviceId) {
-    // TODO: implement bleCharacteristicFrom
-    throw UnimplementedError("bleCharacteristicFrom");
-  }
-
-  @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
       [List<String> services = const <String>[]]) async {
     final nativeDevice = device(deviceId);
@@ -298,19 +291,6 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   }
 
   @override
-  BleUUID characteristicUuidFrom(nativeCharacteristic) {
-    // TODO: implement characteristicUuidFrom
-    throw UnimplementedError("characteristicUuidFrom");
-  }
-
-  @override
-  Future<List<BlueZGattCharacteristic>> characteristicsFor(
-      BleUUID serviceUuid, String deviceId, String name) {
-    // TODO: implement characteristicsFor
-    throw UnimplementedError("characteristicsFor");
-  }
-
-  @override
   BleUUID descriptorUuidFrom(nativeDescriptor) {
     // TODO: implement descriptorUuidFrom
     throw UnimplementedError("descriptorUuidFrom");
@@ -407,6 +387,68 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
     }
   }
 
+  @override
+  BleUUID characteristicUuidFrom(nativeCharacteristic) {
+    return BleUUID(nativeCharacteristic.uuid.toString());
+  }
+
+  @override
+  Future<List<BlueZGattCharacteristic>> characteristicsFor(
+      BleUUID serviceUuid, String deviceId, String name) async {
+    final service = await serviceFor(serviceUuid, deviceId, name);
+    return Future.value(service.characteristics);
+  }
+
+  @override
+  BleCharacteristic bleCharacteristicFrom(nativeCharacteristic,
+      String deviceName, BleUUID serviceUuid, String deviceId) {
+    final flags = nativeCharacteristic.flags;
+
+    return BleCharacteristic(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuidFrom(nativeCharacteristic),
+      properties: BleCharacteristicProperties(
+        // TODO: Support all flags?
+        broadcast: flags.contains(BlueZGattCharacteristicFlag.broadcast),
+        read: flags.contains(BlueZGattCharacteristicFlag.read),
+        writeWithoutResponse:
+            flags.contains(BlueZGattCharacteristicFlag.writeWithoutResponse),
+        write: flags.contains(BlueZGattCharacteristicFlag.write),
+        notify: flags.contains(BlueZGattCharacteristicFlag.notify),
+        indicate: flags.contains(BlueZGattCharacteristicFlag.indicate),
+        authenticatedSignedWrites: flags
+            .contains(BlueZGattCharacteristicFlag.authenticatedSignedWrites),
+        extendedProperties:
+            flags.contains(BlueZGattCharacteristicFlag.extendedProperties),
+        notifyEncryptionRequired:
+            false, //flags.contains(BlueZGattCharacteristicFlag.notifyEncryptionRequired),
+        indicateEncryptionRequired:
+            false, //flags.contains(BlueZGattCharacteristicFlag.indicateEncryptionRequired),
+      ),
+    );
+  }
+
+/*  BlueZGattCharacteristicFlag
+  *broadcast,
+  *read,
+  *writeWithoutResponse,
+  *write,
+  *notify,
+  *indicate,
+  *authenticatedSignedWrites,
+  *extendedProperties,
+  reliableWrite,
+  writableAuxiliaries,
+  encryptRead,
+  encryptWrite,
+  encryptAuthenticatedRead,
+  encryptAuthenticatedWrite,
+  secureRead,
+  secureWrite,
+  authorize,
+*/
   @override
   Future<Stream<List<int>>> setNotifyCharacteristic(
       {required bool notify,
