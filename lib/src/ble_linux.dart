@@ -289,11 +289,6 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   }
 
   @override
-  String exceptionDisplayMessage(Object o) {
-    return (o is BlueZException) ? o.message : o.toString();
-  }
-
-  @override
   nativeFrom({required String deviceId, required String name}) {
     // TODO: implement nativeFrom
     throw UnimplementedError("nativeFrom");
@@ -315,8 +310,25 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   }
 
   @override
-  Future<List<BlueZGattService>> servicesFrom(native) {
-    return Future.value(native.gattServices);
+  Future<List<BlueZGattService>> servicesFrom(native) async {
+    final completer = Completer<List<BlueZGattService>>();
+    StreamSubscription? subscription;
+
+    if (!native.servicesResolved) {
+      subscription = native.propertiesChanged.listen((properties) {
+        final resolvedCompleter = completer;
+        for (final property in properties) {
+          if (property == "ServicesResolved") {
+            resolvedCompleter.complete(native.gattServices);
+            subscription?.cancel();
+          }
+        }
+      });
+    } else {
+      completer.complete(native.gattServices);
+    }
+
+    return completer.future;
   }
 
   @override
@@ -617,5 +629,10 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
         causedBy: e,
       ));
     }
+  }
+
+  @override
+  String exceptionDisplayMessage(Object o) {
+    return (o is BlueZException) ? o.message : o.toString();
   }
 }
