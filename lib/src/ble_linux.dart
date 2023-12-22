@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 
 import 'package:bluez/bluez.dart';
 import 'package:logging/logging.dart';
@@ -273,27 +274,8 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   }
 
   @override
-  FutureOr<BleDescriptor> bleDescriptorFor(
-      BleUUID descriptorUuid,
-      BleUUID characteristicUuid,
-      BleUUID serviceUuid,
-      String deviceId,
-      String deviceName) {
-    // TODO: implement bleDescriptorFor
-    throw UnimplementedError("bleDescriptorFor");
-  }
-
-  @override
-  FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
-      BleUUID serviceUuid, String deviceId, String deviceName) {
-    // TODO: implement bleDescriptorsFor
-    throw UnimplementedError("bleDescriptorsFor");
-  }
-
-  @override
   BleUUID descriptorUuidFrom(nativeDescriptor) {
-    // TODO: implement descriptorUuidFrom
-    throw UnimplementedError("descriptorUuidFrom");
+    return BleUUID(nativeDescriptor.uuid.toString());
   }
 
   @override
@@ -325,17 +307,6 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
       required BleUUID characteristicUuid}) {
     // TODO: implement readCharacteristic
     throw UnimplementedError("readCharacteristic");
-  }
-
-  @override
-  Future<List<int>> readDescriptor(
-      {required String deviceId,
-      required String name,
-      required BleUUID serviceUuid,
-      required BleUUID characteristicUuid,
-      required BleUUID descriptorUuid}) {
-    // TODO: implement readDescriptor
-    throw UnimplementedError("readDescriptor");
   }
 
   @override
@@ -469,5 +440,118 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
       required List<int> value}) {
     // TODO: implement writeCharacteristic
     throw UnimplementedError("writeCharacteristic");
+  }
+
+  BleDescriptor bleDescriptorFrom(
+      BlueZGattDescriptor nativeDescriptor,
+      String deviceName,
+      BleUUID serviceUuid,
+      BleUUID characteristicUuid,
+      String deviceId) {
+    return BleDescriptor(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      serviceUuid: serviceUuid,
+      characteristicUuid: characteristicUuid,
+      descriptorUuid: BleUUID(nativeDescriptor.uuid.toString()),
+    );
+  }
+
+  FutureOr<BlueZGattDescriptor> descriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) async {
+    final descriptors = await descriptorsFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    try {
+      return descriptors
+          .firstWhere((e) => BleUUID(e.uuid.toString()) == descriptorUuid);
+    } catch (e) {
+      return Future.error(UnknownDescriptorException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        descriptorUuid: descriptorUuid,
+        deviceId: deviceId,
+        name: deviceName,
+        causedBy: e,
+      ));
+    }
+  }
+
+  @override
+  FutureOr<BleDescriptor> bleDescriptorFor(
+      BleUUID descriptorUuid,
+      BleUUID characteristicUuid,
+      BleUUID serviceUuid,
+      String deviceId,
+      String deviceName) async {
+    final nativeDescriptor = await descriptorFor(
+        descriptorUuid, characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    return bleDescriptorFrom(nativeDescriptor, deviceName, serviceUuid,
+        characteristicUuid, deviceId);
+  }
+
+  FutureOr<List<BlueZGattDescriptor>> descriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) async {
+    try {
+      final nativeCharacteristic = await characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+
+      return nativeCharacteristic.descriptors;
+    } catch (e) {
+      return Future.error(GetDescriptorsException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        name: deviceName,
+        reason: "Could not get descriptors",
+        causedBy: e,
+      ));
+    }
+  }
+
+  @override
+  FutureOr<List<BleDescriptor>> bleDescriptorsFor(BleUUID characteristicUuid,
+      BleUUID serviceUuid, String deviceId, String deviceName) async {
+    final nativeDescriptors = await descriptorsFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    return nativeDescriptors
+        .map((e) => bleDescriptorFrom(
+            e, deviceName, serviceUuid, characteristicUuid, deviceId))
+        .toList();
+  }
+
+  @override
+  Future<List<int>> readDescriptor(
+      {required String deviceId,
+      required String name,
+      required BleUUID serviceUuid,
+      required BleUUID characteristicUuid,
+      required BleUUID descriptorUuid}) async {
+    try {
+      final descriptor = descriptorFor(
+        descriptorUuid,
+        characteristicUuid,
+        serviceUuid,
+        deviceId,
+        name,
+      );
+      return (await descriptor).readValue();
+    } catch (e) {
+      return Future.error(DescriptorException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        descriptorUuid: descriptorUuid,
+        deviceId: deviceId,
+        name: name,
+        reason: "Could not read descriptor",
+        causedBy: e,
+      ));
+    }
   }
 }
