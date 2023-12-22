@@ -300,16 +300,6 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   }
 
   @override
-  Future<List<int>> readCharacteristic(
-      {required String deviceId,
-      required String deviceName,
-      required BleUUID serviceUuid,
-      required BleUUID characteristicUuid}) {
-    // TODO: implement readCharacteristic
-    throw UnimplementedError("readCharacteristic");
-  }
-
-  @override
   BleUUID serviceUuidFrom(nativeService) {
     return BleUUID(nativeService.uuid.toString());
   }
@@ -426,9 +416,72 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
       required String deviceId,
       required String deviceName,
       required BleUUID serviceUuid,
-      required BleUUID characteristicUuid}) {
-    // TODO: implement setNotifyCharacteristic
-    throw UnimplementedError("setNotifyCharacteristic");
+      required BleUUID characteristicUuid}) async {
+    final nativeCharacteristic = await characteristicFor(
+        characteristicUuid, serviceUuid, deviceId, deviceName);
+
+    if (notify) {
+      try {
+        final notifyStream =
+            nativeCharacteristic.propertiesChanged.expand((element) {
+          _log.finer("characteristic propertiesChanged: $element");
+
+          return element.fold(List<List<int>>.empty(growable: true),
+              (results, element) {
+            if (element == "Value") {
+              results.add(nativeCharacteristic.value);
+            }
+
+            return results;
+          });
+        });
+
+        nativeCharacteristic.startNotify();
+        return Future.value(notifyStream);
+      } catch (e) {
+        return Future.error(FailedToEnableNotification(
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          deviceName: deviceName,
+          causedBy: e,
+        ));
+      }
+    } else {
+      try {
+        nativeCharacteristic.stopNotify();
+        return Future.value(const Stream.empty());
+      } catch (e) {
+        return Future.error(FailedToDisableNotification(
+          characteristicUuid: characteristicUuid,
+          serviceUuid: serviceUuid,
+          deviceId: deviceId,
+          deviceName: deviceName,
+          causedBy: e,
+        ));
+      }
+    }
+  }
+
+  @override
+  Future<List<int>> readCharacteristic(
+      {required String deviceId,
+      required String deviceName,
+      required BleUUID serviceUuid,
+      required BleUUID characteristicUuid}) async {
+    try {
+      final nativeCharacteristic = characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+      return Future.value((await nativeCharacteristic).readValue());
+    } catch (e) {
+      return Future.error(ReadingCharacteristicException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        causedBy: e,
+      ));
+    }
   }
 
   @override
@@ -437,9 +490,20 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
       required String deviceName,
       required BleUUID serviceUuid,
       required BleUUID characteristicUuid,
-      required List<int> value}) {
-    // TODO: implement writeCharacteristic
-    throw UnimplementedError("writeCharacteristic");
+      required List<int> value}) async {
+    try {
+      final nativeCharacteristic = await characteristicFor(
+          characteristicUuid, serviceUuid, deviceId, deviceName);
+      await nativeCharacteristic.writeValue(value);
+    } catch (e) {
+      return Future.error(WritingCharacteristicException(
+        characteristicUuid: characteristicUuid,
+        serviceUuid: serviceUuid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        causedBy: e,
+      ));
+    }
   }
 
   BleDescriptor bleDescriptorFrom(

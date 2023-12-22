@@ -241,8 +241,8 @@ class CharacteristicException extends RiverpodBleException with BleDeviceInfo {
 }
 
 @immutable
-class ReadCharacteristicException extends CharacteristicException {
-  const ReadCharacteristicException({
+class WritingCharacteristicException extends CharacteristicException {
+  const WritingCharacteristicException({
     required super.characteristicUuid,
     required super.serviceUuid,
     required super.deviceId,
@@ -252,7 +252,7 @@ class ReadCharacteristicException extends CharacteristicException {
   });
 
   @override
-  String formatBase(s) => "ReadCharacteristicException";
+  String formatBase(s) => "Failed to write characteristic";
 }
 
 @immutable
@@ -272,7 +272,22 @@ class UnknownCharacteristic extends CharacteristicException {
 }
 
 @immutable
-class FailedToEnableNotification extends CharacteristicException {
+class FailedNotificationException extends CharacteristicException {
+  const FailedNotificationException(
+      {required super.characteristicUuid,
+      required super.serviceUuid,
+      required super.deviceId,
+      required super.deviceName,
+      super.reason,
+      super.causedBy});
+
+  @override
+  String formatBase(base) =>
+      super.formatBase("Characteristic notification exception");
+}
+
+@immutable
+class FailedToEnableNotification extends FailedNotificationException {
   const FailedToEnableNotification(
       {required super.characteristicUuid,
       required super.serviceUuid,
@@ -283,6 +298,20 @@ class FailedToEnableNotification extends CharacteristicException {
 
   @override
   String formatBase(base) => super.formatBase("Failed to enable notification");
+}
+
+@immutable
+class FailedToDisableNotification extends FailedNotificationException {
+  const FailedToDisableNotification(
+      {required super.characteristicUuid,
+      required super.serviceUuid,
+      required super.deviceId,
+      required super.deviceName,
+      super.reason,
+      super.causedBy});
+
+  @override
+  String formatBase(base) => super.formatBase("Failed to disable notification");
 }
 
 @immutable
@@ -407,7 +436,7 @@ class BleUuidNameException extends RiverpodBleException {
   final BleUUID uuid;
   final String yamlFilepath;
 
-  BleUuidNameException(this.uuid, this.yamlFilepath, {super.causedBy});
+  const BleUuidNameException(this.uuid, this.yamlFilepath, {super.causedBy});
 
   @override
   String toString() => exceptionMessage("Error getting name for uuid",
