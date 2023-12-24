@@ -290,7 +290,7 @@ class BleWinBle
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
-      [List<String> services = const <String>[]]) async {
+      {List<String> services = const <String>[]}) async {
     final completer = Completer<BleDevice>();
 
     try {

@@ -208,7 +208,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
-      [List<String> services = const <String>[]]) async {
+      {List<String> services = const <String>[]}) async {
     final nativeDevice = device(deviceId);
     if (nativeDevice == null) {
       throw UnimplementedError(

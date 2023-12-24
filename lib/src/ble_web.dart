@@ -239,7 +239,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
-      [List<String> services = const <String>[]]) async {
+      {List<String> services = const <String>[]}) async {
     // We have to do a connectDevice (prompting) unless we've already done that
     var native = device(deviceId);
     if (native == null) {

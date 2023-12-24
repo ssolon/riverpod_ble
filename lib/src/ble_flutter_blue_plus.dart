@@ -161,7 +161,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
-      [List<String> services = const <String>[]]) async {
+      {List<String> services = const <String>[]}) async {
     final native = deviceFor(deviceId, deviceName);
     await native.connect();
 
