@@ -24,7 +24,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   ///
   /// Devices are removed from this list when they are removed from BlueZ.
 
-  Set<BleScannedDevice> _blueZDevices = HashSet<BleScannedDevice>(
+  Set<BleScannedDevice> _discoveredDevices = HashSet<BleScannedDevice>(
       equals: (a, b) => scannedDeviceIdOf(a) == scannedDeviceIdOf(b),
       hashCode: (o) => scannedDeviceIdOf(o).hashCode);
 
@@ -100,24 +100,24 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
     _deviceAddedSubscription = _client?.deviceAdded.listen((device) {
       _log.finer('Device added: $device/${device.address}}');
 
-      _blueZDevices.add(_scannedDeviceFrom(device));
+      _discoveredDevices.add(_scannedDeviceFrom(device));
 
-      _scannerResultsStreamController.add(_blueZDevices.toList());
+      _scannerResultsStreamController.add(_discoveredDevices.toList());
     });
 
     _deviceRemovedSubscription = _client?.deviceRemoved.listen((device) {
       _log.finer('Device removed: $device/${device.address}}');
 
-      _blueZDevices.removeWhere(
+      _discoveredDevices.removeWhere(
           (element) => scannedDeviceIdOf(element) == device.address);
 
-      _scannerResultsStreamController.add(_blueZDevices.toList());
+      _scannerResultsStreamController.add(_discoveredDevices.toList());
     });
 
     // Preload currently known devices
 
     for (final device in _client?.devices ?? []) {
-      _blueZDevices.add(_scannedDeviceFrom(device));
+      _discoveredDevices.add(_scannedDeviceFrom(device));
     }
   }
 
@@ -147,7 +147,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
     // Start with everything currently known
 
-    _scannerResultsStreamController.add(_blueZDevices.toList());
+    _scannerResultsStreamController.add(_discoveredDevices.toList());
 
     _adapter?.startDiscovery();
   }
