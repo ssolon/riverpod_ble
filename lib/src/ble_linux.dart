@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:math';
 
 import 'package:bluez/bluez.dart';
 import 'package:logging/logging.dart';
@@ -17,7 +16,17 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
   /// Connection to BlueZ streams
   StreamSubscription? _deviceAddedSubscription;
+  StreamSubscription? _deviceRemovedSubscription;
   StreamSubscription? _propertiesChangedSubscription;
+
+  /// Keep track of devices that are currently instantiated as objects known
+  /// to the client. Apparently only thosse devices can be connected to.
+  ///
+  /// Devices are removed from this list when they are removed from BlueZ.
+
+  Set<BleScannedDevice> _blueZDevices = HashSet<BleScannedDevice>(
+      equals: (a, b) => scannedDeviceIdOf(a) == scannedDeviceIdOf(b),
+      hashCode: (o) => scannedDeviceIdOf(o).hashCode);
 
   ///////////////////////////////
   /// Scanner
@@ -60,6 +69,8 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
     bluetoothAdapterStateStreamController.add(BleBluetoothState.on);
 
+    // Track properties and dispatch events
+
     _propertiesChangedSubscription = _adapter?.propertiesChanged.listen(
       (events) {
         for (final event in events) {
@@ -72,6 +83,8 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
               _isScanning = discovering;
               break;
 
+            // TODO: Handle other properties
+
             case 'Powered':
               break;
 
@@ -81,6 +94,31 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
         }
       },
     );
+
+    // Subscribe to device added/removed events
+
+    _deviceAddedSubscription = _client?.deviceAdded.listen((device) {
+      _log.finer('Device added: $device/${device.address}}');
+
+      _blueZDevices.add(_scannedDeviceFrom(device));
+
+      _scannerResultsStreamController.add(_blueZDevices.toList());
+    });
+
+    _deviceRemovedSubscription = _client?.deviceRemoved.listen((device) {
+      _log.finer('Device removed: $device/${device.address}}');
+
+      _blueZDevices.removeWhere(
+          (element) => scannedDeviceIdOf(element) == device.address);
+
+      _scannerResultsStreamController.add(_blueZDevices.toList());
+    });
+
+    // Preload currently known devices
+
+    for (final device in _client?.devices ?? []) {
+      _blueZDevices.add(_scannedDeviceFrom(device));
+    }
   }
 
   @override
@@ -95,36 +133,6 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   void startScan(
       {Duration timeout = const Duration(seconds: 30),
       List<BleUUID>? withServices}) {
-    final Set devices = HashSet<BleScannedDevice>(
-        equals: (a, b) => scannedDeviceIdOf(a) == scannedDeviceIdOf(b),
-        hashCode: (o) => scannedDeviceIdOf(o).hashCode);
-
-    void addDevice(BleScannedDevice device) {
-      if (devices.contains(device)) {
-        devices.remove(device);
-      }
-
-      devices.add(device);
-    }
-
-    // Prevously discovered devices don't show up in scan so add first
-    // TODO: Identify those we've connected to and add them as "connected"
-    //       devices
-    for (final device in _client?.devices ?? []) {
-      addDevice(_scannedDeviceFrom(device));
-    }
-
-    // Add devices as we discover them
-
-    _deviceAddedSubscription = _client?.deviceAdded.listen((device) {
-      _log.finer('Device added: $device/${device.address}}');
-
-      addDevice(_scannedDeviceFrom(device));
-
-      _scannerResultsStreamController
-          .add(devices.toList() as List<BleScannedDevice>);
-    });
-
     if (timeout.inSeconds > 0) {
       _scanTimeoutTimer = Timer(timeout, () {
         _log.finer('Scan timeout');
@@ -132,8 +140,14 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
       });
     }
 
+    // TODO: Support more filters?
+
     _adapter?.setDiscoveryFilter(
         uuids: withServices?.map((e) => e.toString()).toList());
+
+    // Start with everything currently known
+
+    _scannerResultsStreamController.add(_blueZDevices.toList());
 
     _adapter?.startDiscovery();
   }
