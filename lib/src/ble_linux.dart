@@ -208,11 +208,37 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
-      {List<String> services = const <String>[]}) async {
+      {List<String> services = const <String>[],
+      int timeoutSeconds = 30}) async {
+    final completer = Completer<BleDevice>();
+
+    // Set timer to cancel connection attempt if it takes too long
+
+    final timeoutTimer = Timer(Duration(seconds: timeoutSeconds), () {
+      _log.finer("Connection attempt to $deviceId/$deviceName timed out");
+      completer.completeError(BleConnectionException(deviceId, deviceName,
+          "Connection attempt timed out after $timeoutSeconds seconds"));
+    });
+
+    // Check if device is available
+
+    try {
+      final available =
+          await _deviceAvailable(deviceId, deviceName, Completer<void>());
+
+      if (!available) {
+        throw BleConnectionException(
+            deviceId, deviceName, "Device not available");
+      }
+    } catch (e) {
+      return Future.error(e);
+    }
+
     final nativeDevice = device(deviceId);
     if (nativeDevice == null) {
-      throw UnimplementedError(
-          "Connecting to unscanned device not supported yet");
+      throw BleUnexpectedError(
+          reason:
+              "Native device not found after being discovered: $deviceId/$deviceName");
     }
 
     try {
@@ -230,7 +256,59 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
     } catch (e) {
       throw BleConnectionException(deviceId, deviceName, "Could not connect",
           causedBy: e);
+    } finally {
+      timeoutTimer.cancel();
     }
+  }
+
+  /// Check to if [deviceId] is available
+  ///
+  /// With the current version of BlueZ we can only connect to devices that
+  /// have been discovered so if we haven't discovered the device yet we'll
+  /// have to scan for it first.
+  ///
+  /// [timeout] will end with an error for the device if it is not discovered
+  /// within the given time so this method either returns true or throws an
+  /// exception.
+  FutureOr<bool> _deviceAvailable(
+      String deviceId, String deviceName, Completer timeoutCompleter) async {
+    bool available = false;
+
+    // Listen for signals from BlueZ about devices being added
+
+    final addedSubscription = _client?.deviceAdded.listen((device) {
+      if (device.address == deviceId) {
+        _log.finer("_deviceAvailable: Device $deviceId added");
+        timeoutCompleter.complete();
+      }
+    });
+
+    try {
+      available = _discoveredDevices
+          .where((element) => scannedDeviceIdOf(element) == deviceId)
+          .isNotEmpty;
+
+      if (!available) {
+        _log.finer("Device $deviceId not discovered yet, starting scan");
+
+        // TODO: Add filter for device address
+        startScan();
+        await timeoutCompleter.future;
+
+        //  No error means we found it
+        available = true;
+      }
+    } catch (e) {
+      throw BleConnectionException(deviceId, deviceName, "Device not found",
+          causedBy: e);
+    } finally {
+      if (_isScanning) {
+        stopScan();
+      }
+      addedSubscription?.cancel();
+    }
+
+    return available;
   }
 
   @override
