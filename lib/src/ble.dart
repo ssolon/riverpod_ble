@@ -45,7 +45,7 @@ defaultLogRecord(LogRecord record) =>
 Future<void> riverpodBleInit({
   Backend? backend,
   void Function(LogRecord) logRecord = defaultLogRecord,
-  Level rootLoggingLevel = Level.FINER,
+  Level rootLoggingLevel = Level.ALL,
 }) async {
   Logger.root.onRecord.listen(logRecord);
   Logger.root.level = rootLoggingLevel;
@@ -164,7 +164,7 @@ abstract class Ble<T, S, C, D> {
   /// Some platforms (e.g. web) will require the services that will be accessed
   /// to be defined as [services].
   Future<BleDevice> connectTo(String deviceId, String deviceName,
-      [List<String> services = const <String>[]]);
+      {List<String> services = const <String>[]});
 
   /// Return the native services for [deviceId]
   Future<List<S>> servicesFor(String deviceId, String name);
@@ -840,7 +840,7 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
 
   _fail(e, t) {
     state = AsyncError(
-        ReadCharacteristicException(
+        ReadingCharacteristicException(
           causedBy: e,
           characteristicUuid: characteristicUuid,
           serviceUuid: serviceUuid,
