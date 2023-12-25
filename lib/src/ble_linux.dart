@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:ui';
 
 import 'package:bluez/bluez.dart';
+import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 
 import 'states/ble_scan_result.dart';
@@ -11,6 +13,13 @@ final _log = Logger('BleLinux');
 
 class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
     BlueZGattCharacteristic, BlueZGattDescriptor> {
+  /// Should we allow exit?
+  bool exitWhenRequested = true;
+
+  LinuxBle(this.exitWhenRequested);
+
+  AppLifecycleListener? _lifecycleListener;
+
   BlueZClient? _client;
   BlueZAdapter? _adapter;
 
@@ -24,7 +33,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   ///
   /// Devices are removed from this list when they are removed from BlueZ.
 
-  Set<BleScannedDevice> _discoveredDevices = HashSet<BleScannedDevice>(
+  final Set<BleScannedDevice> _discoveredDevices = HashSet<BleScannedDevice>(
       equals: (a, b) => scannedDeviceIdOf(a) == scannedDeviceIdOf(b),
       hashCode: (o) => scannedDeviceIdOf(o).hashCode);
 
@@ -56,6 +65,15 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
         return Future.error(
             const BleInitializationError(reason: 'Could not connect to BlueZ'));
       }
+
+      _lifecycleListener = AppLifecycleListener(
+        onExitRequested: () {
+          _log.finer("onExitRequested");
+          return _exitRequested();
+        },
+        onStateChange: (AppLifecycleState state) =>
+            _log.finer("onStateChange: $state"),
+      );
     }
 
     final adapters = _client?.adapters ?? [];
@@ -121,10 +139,38 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
     }
   }
 
+  /// Exit the app if requested after shutting everything down
+  /// since Linux or at least BlueZ doesn't do it for us.
+  Future<AppExitResponse> _exitRequested() async {
+    _log.finer("Exit requested");
+
+    if (exitWhenRequested) {
+      await dispose();
+      return Future.value(AppExitResponse.exit);
+    }
+
+    return Future.value(AppExitResponse.cancel);
+  }
+
   @override
-  Future<void> dispose() {
+  Future<void> dispose() async {
     _deviceAddedSubscription?.cancel();
+    _deviceAddedSubscription = null;
+
+    _deviceRemovedSubscription?.cancel();
+    _deviceRemovedSubscription = null;
+
     _propertiesChangedSubscription?.cancel();
+    _propertiesChangedSubscription = null;
+
+    // Disconnect any connected devices
+
+    for (final connectedDevice in devices.values.where((d) => d.connected)) {
+      connectedDevice.disconnect();
+    }
+
+    _client?.close();
+    _client = null;
 
     return Future.value();
   }

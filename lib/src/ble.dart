@@ -42,15 +42,39 @@ defaultLogRecord(LogRecord record) =>
         "${logItem('error', record.error)}"
         "${logItem('stackTrace', record.stackTrace)}");
 
+/// Initialize the Riverpod BLE module
+/// [backend] is the backend to use. If not specified the backend will be
+/// chosen based on the platform so you probably shouldn't set this.
+///
+/// [logRecord] is the function to call to log a record. If not specified
+/// the defaultLogRecord function will be used.
+///
+/// [rootLoggingLevel] is the logging level to use for the root logger.
+/// Defaults to Level.ALL.
+///
+/// [exitWhenRequested] is used by some backends to indicate that the application
+/// should exit when a request is made to exit. Defaults to true but is only
+/// used by the Linux backend which doesn't close connections otherwise.
 Future<void> riverpodBleInit({
   Backend? backend,
   void Function(LogRecord) logRecord = defaultLogRecord,
   Level rootLoggingLevel = Level.ALL,
+  bool exitWhenRequested = true,
 }) async {
   Logger.root.onRecord.listen(logRecord);
   Logger.root.level = rootLoggingLevel;
 
-  _ble = setupBackend();
+  _ble = setupBackend(exitWhenRequested);
+}
+
+/// Called to shut down the Riverpod BLE module
+/// and close all devices.
+///
+/// This may only be necessary on Linux.
+/// TODO: Check on behavior on other platforms!
+///
+Future<void> riverpodBleDispose() async {
+  await _ble.dispose();
 }
 
 late Ble _ble; // = FlutterBluePlusBle();
@@ -102,7 +126,7 @@ abstract class Ble<T, S, C, D> {
   /// Stop the scanner
   void stopScan();
 
-  /// Keep track of the devices we know about at their native type
+  /// Keep track of the devices we know about and their native type
   Map<String, T> devices = {};
 
   /// Register a native device
@@ -447,6 +471,7 @@ class Initialization extends _$Initialization {
     );
 
     ref.onDispose(() {
+      _logger.fine("BleInitialize: dispose");
       _bluetoothStateSubscription.cancel();
     });
 
@@ -1126,8 +1151,8 @@ FutureOr<bool?> bleIsConnectedFromException(Exception e) async {
 ///
 /// Try to do better:
 /// We want to display what we were doing and what caused the problems which
-/// should be the [e] itself and if [e] is a [RiverpodBleException] used
-/// the [causedBy] to find the root should be the underlying cause for
+/// should be the [e] itself and if [e] is a [RiverpodBleException] use
+/// [causedBy] to find the root which should be the underlying cause for
 /// the top exception to have failed.
 ///
 Future<String> bleExceptionDisplayMessage(Object e) async {
@@ -1135,6 +1160,8 @@ Future<String> bleExceptionDisplayMessage(Object e) async {
     final root = CausedBy.rootCause(e);
 
     if (root is RiverpodBleException) {
+      // Special case connection problems
+
       final top = e as RiverpodBleException;
 
       // If  there is a connection problem then that trumps everything else
