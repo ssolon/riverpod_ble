@@ -49,6 +49,23 @@ class BleInitializationError extends RiverpodBleException {
       );
 }
 
+/// Exception thrown when something that should never happen -- happens.
+@immutable
+class BleUnexpectedError extends RiverpodBleException {
+  final String? reason;
+
+  const BleUnexpectedError({this.reason, super.causedBy});
+
+  @override
+  String toString() => exceptionMessage(
+        "Unexpected exception",
+        [
+          (n: 'reason', v: maybeUnknown(reason)),
+        ],
+        [],
+      );
+}
+
 @immutable
 class BleBluetoothNotAvailableException extends RiverpodBleException {
   final String? reason;
