@@ -349,9 +349,13 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
   }
 
   @override
-  Future<List<BleDevice>> connectedDevices() {
-    // TODO: implement connectedDevices
-    throw UnimplementedError("connectedDevices");
+  Future<List<BleDevice>> connectedDevices() async {
+    return Future.wait(
+      devices.values
+          .where((element) => element.connected)
+          .map((e) => bleDeviceFor(e))
+          .toList(),
+    );
   }
 
   @override
@@ -362,8 +366,9 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
   @override
   FutureOr<BleConnectionState> connectionStatusOf(native) {
-    // TODO: implement connectionStatusOf
-    throw UnimplementedError("connectionStatusOf");
+    return native.connected
+        ? BleConnectionState.connected()
+        : BleConnectionState.disconnected();
   }
 
   @override
