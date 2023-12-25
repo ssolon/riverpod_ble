@@ -38,6 +38,8 @@ Currently the following platforms are supported:
 
 ## Getting started
 
+This package is not yet published and is not ready for general used yet.
+
 TODO: List prerequisites and provide or point to information on how to
 start using the package.
 
