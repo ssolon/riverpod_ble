@@ -34,6 +34,7 @@ Currently the following platforms are supported:
 * Android, IOS, MacOs using [flutter_blue_plus](https://pub.dev/packages/flutter_blue_plus)
 * Windows using [win_ble](https://pub.dev/packages/win_ble) 
 * Web using [flutter_web_bluetooth](https://pub.dev/packages/flutter_web_bluetooth)
+* Linx using [bluez](https://pub.dev/packages/bluez)
 
 ## Getting started
 
@@ -48,6 +49,23 @@ to `/example` folder.
 ```dart
 const like = 'sample';
 ```
+
+## Platform Specific Weirdness
+Some platforms have additional requirements, restrictions and other weirdness.
+
+### Linux
+The [bluez](https://pub.dev/packages/bluez) package used to support Linux
+doesn't close connections when the application exits (at least not as of version
+0.8.1) so an AppLifecycleListener is used to detect AppExit and since it has to
+return either `exit` or `cancel` it will return `exit`.
+
+This can be overridden by the `exitWhenRequested` parameter to `riverpodBleInit`
+which has a default value of `true`. Setting it to `false` will disable this 
+action.
+
+If this action is disabled the application should call `riverpodBleDispose`
+before exiting or ensure that all connections are closed by having all
+connection providers go out of scope.
 
 ## Additional information
 
