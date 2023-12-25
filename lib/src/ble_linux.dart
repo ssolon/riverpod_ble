@@ -289,16 +289,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
     try {
       await nativeDevice.connect();
-
-      return BleDevice(
-        deviceId: deviceId,
-        name: deviceName,
-        nativeDevice: nativeDevice,
-        services: nativeDevice.gattServices
-            .map((e) => BleUUID(e.uuid.toString()))
-            .toList(),
-        status: BleConnectionState.connected(),
-      );
+      return bleDeviceFor(nativeDevice);
     } catch (e) {
       throw BleConnectionException(deviceId, deviceName, "Could not connect",
           causedBy: e);
