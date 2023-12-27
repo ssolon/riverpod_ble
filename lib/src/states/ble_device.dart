@@ -24,12 +24,4 @@ class BleDevice<T> with _$BleDevice {
     Map<BleUUID, List<int>>? serviceData,
     required BleConnectionState status,
   }) = _BleDevice;
-
-  // TODO: Do we need this (and scanned as separate state)?
-  factory BleDevice.error({
-    required String deviceId,
-    required String name,
-    required Object error,
-    StackTrace? stack,
-  }) = Error;
 }
