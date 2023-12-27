@@ -21,7 +21,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
 
   @override
   Future<void> initialize() async {
-    bluetoothAdapterStateStreamController.add(await FlutterBluePlus.isAvailable
+    _logger.info("initialize");
+    bluetoothAdapterStateStreamController.add(await FlutterBluePlus.isSupported
         ? BleBluetoothState.on
         : BleBluetoothState.unknown);
 
@@ -73,7 +74,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
                 deviceId: r.device.remoteId.str,
                 name: r.device.platformName,
                 services: r.advertisementData.serviceUuids
-                    .map((e) => BleUUID(e.uuid128))
+                    .map((e) => BleUUID(e.str128))
                     .toList(),
                 manufacturerData: r.advertisementData.manufacturerData,
                 serviceData: r.advertisementData.serviceData.map(
