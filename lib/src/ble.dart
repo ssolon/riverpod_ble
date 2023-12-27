@@ -393,8 +393,8 @@ class BleScanner extends _$BleScanner {
 
   /// Stop scanning
   void stop() {
-    _logger.info("Stop scanning");
     if (_ble.isScanningNow) {
+      _logger.info("Stop scanning");
       _ble.stopScan();
     }
 
