@@ -7,9 +7,6 @@ part 'ble_device.freezed.dart';
 
 @freezed
 class BleDevice<T> with _$BleDevice {
-  factory BleDevice.initial() = Initial;
-  factory BleDevice.connecting({required String deviceId}) = Connecting;
-
   factory BleDevice.scanned({
     required String deviceId,
     required String name,
@@ -28,6 +25,7 @@ class BleDevice<T> with _$BleDevice {
     required BleConnectionState status,
   }) = _BleDevice;
 
+  // TODO: Do we need this (and scanned as separate state)?
   factory BleDevice.error({
     required String deviceId,
     required String name,
