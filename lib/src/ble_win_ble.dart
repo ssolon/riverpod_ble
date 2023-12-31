@@ -131,7 +131,7 @@ class BleWinBle
 
     logger.fine("ble.initialize: starting");
     await win.WinBle.initialize(
-      serverPath: await WinServer.path,
+      serverPath: await WinServer.path(),
       enableLog: true,
     );
   }
