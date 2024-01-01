@@ -69,6 +69,9 @@ If this action is disabled the application should call `riverpodBleDispose`
 before exiting or ensure that all connections are closed by having all
 connection providers go out of scope.
 
+#### Scanning
+Scan result doesn't support "connectable" property.
+
 ## Additional information
 
 TODO: Tell users more about the package: where to find more information, how to
