@@ -7,8 +7,8 @@ part 'ble_scan_result.freezed.dart';
 @freezed
 class BleScannedDevice with _$BleScannedDevice {
   factory BleScannedDevice(
-          BleDevice device, int rssi, DateTime timeStamp, Object nativeDevice) =
-      _BleScannedDevice;
+      BleDevice device, int rssi, DateTime timeStamp, Object nativeDevice,
+      [bool? connectable]) = _BleScannedDevice;
 }
 
 @freezed
