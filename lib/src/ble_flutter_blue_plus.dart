@@ -58,6 +58,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
         (results) => results.map((r) {
           _logger.finest("Scanned device ${r.device.platformName}"
               " address=${r.device.remoteId.str}"
+              " name=${r.device.name}"
+              " localName=${r.advertisementData.localName}"
               " advName=${r.advertisementData.advName}"
               " platformName=${r.device.platformName}");
           r.advertisementData.manufacturerData.forEach((key, value) {
@@ -82,7 +84,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
               ),
               r.rssi,
               r.timeStamp,
-              r.device);
+              r.device,
+              r.advertisementData.connectable);
         }).toList(),
       );
 
