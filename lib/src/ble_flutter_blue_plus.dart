@@ -141,7 +141,8 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   BluetoothDevice nativeFrom(
           {required String deviceId, required String name}) =>
       BluetoothDevice.fromProto(
-        BmBluetoothDevice(remoteId: deviceId, platformName: name),
+        BmBluetoothDevice(
+            remoteId: DeviceIdentifier(deviceId), platformName: name),
       );
 
   @override
