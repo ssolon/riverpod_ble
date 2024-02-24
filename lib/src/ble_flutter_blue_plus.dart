@@ -458,6 +458,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
         serviceUuid: serviceUuid,
         deviceId: deviceId,
         deviceName: deviceName,
+        causedBy: e,
       ));
     }
   }
