@@ -184,6 +184,8 @@ class NameForCharacteristic extends _$NameForCharacteristic {
         'packages/riverpod_ble/files/yaml/characteristic_uuids.yaml';
     final completer = Completer<String>();
     final uuid = characteristic.characteristicUuid;
+    final deviceId =
+        BleDeviceId(characteristic.deviceId, characteristic.deviceName);
 
     ref.listen(
       nameForProvider(uuid, servicesPath),
@@ -195,10 +197,10 @@ class NameForCharacteristic extends _$NameForCharacteristic {
             try {
               final ds = ref.listen(
                   bleDescriptorsForProvider(
-                      characteristicUuid: characteristic.characteristicUuid,
-                      serviceUuid: characteristic.serviceUuid,
-                      deviceId: characteristic.deviceId,
-                      deviceName: characteristic.deviceName), (previous, next) {
+                    characteristicUuid: characteristic.characteristicUuid,
+                    serviceUuid: characteristic.serviceUuid,
+                    deviceId: deviceId,
+                  ), (previous, next) {
                 next.maybeWhen(
                   data: (data) {
                     final ds = data.where(isUserDescriptor);
@@ -207,8 +209,7 @@ class NameForCharacteristic extends _$NameForCharacteristic {
                       try {
                         ref.listen(
                           bleDescriptorValueProvider(
-                            d.deviceId,
-                            characteristic.deviceName,
+                            BleDeviceId(d.deviceId, characteristic.deviceName),
                             d.serviceUuid,
                             d.characteristicUuid,
                             d.descriptorUuid,

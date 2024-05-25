@@ -101,8 +101,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
         [
           BleScannedDevice(
             BleDevice.scanned(
-              deviceId: device.id,
-              name: device.name ?? '',
+              deviceId: BleDeviceId(device.id, device.name ?? ''),
               services: [],
             ),
             0,
@@ -257,7 +256,7 @@ class BleWeb extends Ble<BleWebDevice, web.BluetoothService,
       await native.nativeDevice.connect();
     }
 
-    return Future.value(bleDeviceFor(native));
+    return Future.value(bleDeviceFor(native, deviceName));
   }
 
   @override

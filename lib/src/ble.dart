@@ -171,11 +171,13 @@ abstract class Ble<T, S, C, D> {
     };
   }
 
-  /// Create a [BleDevice] for the native device [native]
+  /// Create a [BleDevice] for the native device [native].
+  /// Some platforms won't return a name on connect so we'll use [name].
   // TODO This should be deviceFrom to be consistent with other names
-  Future<BleDevice> bleDeviceFor(T native) async => BleDevice(
-        deviceId: deviceIdOf(native),
-        name: nameOf(native),
+  Future<BleDevice> bleDeviceFor(T native, [String name = '']) async =>
+      BleDevice(
+        deviceId: BleDeviceId(deviceIdOf(native),
+            switch (nameOf(native)) { '' => name, String s => s }),
         nativeDevice: native,
         status: await connectionStatusOf(native),
       );
@@ -486,26 +488,26 @@ class Initialization extends _$Initialization {
 class BleConnection extends _$BleConnection {
   final _completer = Completer<BleDevice>();
   @override
-  Future<BleDevice> build(String deviceId, String deviceName) async {
-    _logger.fine('BleConnection: build');
+  Future<BleDevice> build(BleDeviceId deviceId) async {
+    _logger.fine('BleConnection: build $deviceId');
 
     ref.onDispose(() {
-      _logger.fine("BleConnection: dispose");
+      _logger.fine("BleConnection: dispose $deviceId");
       disconnect();
     });
 
     //!!!! Debugging
     ref.onAddListener(() {
-      _logger.fine('BleConnection: addListener');
+      _logger.fine('BleConnection: addListener $deviceId');
     });
     ref.onRemoveListener(() {
-      _logger.fine('BleConnection: removeListener');
+      _logger.fine('BleConnection: removeListener $deviceId');
     });
     ref.onCancel(() {
-      _logger.fine('BleConnection: cancel');
+      _logger.fine('BleConnection: cancel $deviceId');
     });
     ref.onResume(() {
-      _logger.fine('BleConnection: resume');
+      _logger.fine('BleConnection: resume $deviceId');
     });
     //!!!! Debugging
 
@@ -526,7 +528,7 @@ class BleConnection extends _$BleConnection {
                     error is BleConnectionException
                         ? error
                         : BleConnectionException(
-                            deviceId, deviceName, "Connecting",
+                            deviceId.id, deviceId.name, "Connecting",
                             causedBy: error),
                     t);
               }
@@ -539,7 +541,7 @@ class BleConnection extends _$BleConnection {
       );
     } catch (error, t) {
       state = AsyncError(
-          BleConnectionException(deviceId, deviceName, "Intialization",
+          BleConnectionException(deviceId.id, deviceId.name, "Intialization",
               causedBy: error),
           t);
     }
@@ -549,26 +551,26 @@ class BleConnection extends _$BleConnection {
 
   FutureOr<BleDevice> connect() async {
     try {
-      final device = await _ble.connectTo(deviceId, deviceName);
+      final device = await _ble.connectTo(deviceId.id, deviceId.name);
       _logger.finest('BleConnection: connected');
       return device;
     } catch (e) {
       return Future.error(BleConnectionException(
-          deviceId, deviceName, 'Connecting',
+          deviceId.id, deviceId.name, 'Connecting',
           causedBy: e));
     }
   }
 
   Future<void> disconnect() async {
-    _logger.fine("BleConnection: disconnect from $deviceName/$deviceId");
+    _logger.fine("BleConnection: disconnect from $deviceId");
     try {
-      _ble.disconnectFrom(deviceId, deviceName);
+      _ble.disconnectFrom(deviceId.id, deviceId.name);
     } catch (e) {
       _logger.warning("BleConnection: disconnect error $e");
 
       Future.error(e is BleConnectionException
           ? e
-          : BleConnectionException(deviceId, deviceName, 'Disconnecting',
+          : BleConnectionException(deviceId.id, deviceId.name, 'Disconnecting',
               causedBy: e));
     }
   }
@@ -582,16 +584,15 @@ class BleConnection extends _$BleConnection {
 class BleConnectionMonitor extends _$BleConnectionMonitor {
   @override
   FutureOr<BleConnectionState> build(
-    String deviceId,
-    String deviceName,
+    BleDeviceId deviceId,
   ) async {
     Stream<BleConnectionState>? states;
 
     ref.onDispose(() => _logger.fine("BleConnectionMonitor.onDispose"));
 
-    _logger.fine("BleConnectionMonitor.build $deviceId/$deviceName");
+    _logger.fine("BleConnectionMonitor.build $deviceId");
 
-    ref.listen(bleConnectionProvider(deviceId, deviceName), (previous, next) {
+    ref.listen(bleConnectionProvider(deviceId), (previous, next) {
       next.when(
         data: (data) async {
           // Connected?
@@ -605,7 +606,7 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
           // up
 
           if (states == null) {
-            states = _ble.connectionStreamFor(deviceId, deviceName);
+            states = _ble.connectionStreamFor(deviceId.id, deviceId.name);
 
             await for (final s in states!) {
               _logger.fine("BleConnectionMonitor: stream $s");
@@ -616,7 +617,8 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
         loading: () => state = const AsyncLoading(),
         error: (error, stackTrace) {
           state = AsyncError(
-              BleConnectionException(deviceId, deviceName, '', causedBy: error),
+              BleConnectionException(deviceId.id, deviceId.name, '',
+                  causedBy: error),
               stackTrace);
         },
       );
@@ -632,11 +634,10 @@ class BleServicesFor extends _$BleServicesFor {
 
   @override
   FutureOr<List<BleService>> build(
-    String deviceId,
-    String deviceName,
+    BleDeviceId deviceId,
   ) async {
     _logger.finest('bleServicesFor: start');
-    ref.listen(bleConnectionProvider(deviceId, deviceName), (previous, next) {
+    ref.listen(bleConnectionProvider(deviceId), (previous, next) {
       next.when(
         loading: () {
           _logger.finest('bleServicesFor: loading');
@@ -647,7 +648,8 @@ class BleServicesFor extends _$BleServicesFor {
 
           // Connected, discover services
           try {
-            final result = await _ble.bleServicesFor(deviceId, deviceName);
+            final result =
+                await _ble.bleServicesFor(deviceId.id, deviceId.name);
             _logger.finest('bleServicesFor: got services');
             state = AsyncData(result);
           } catch (e, stack) {
@@ -687,7 +689,7 @@ class BleServicesFor extends _$BleServicesFor {
 
   void _fail(e, t) {
     state = AsyncError(
-        BleServiceFetchException(deviceId, deviceName, causedBy: e), t);
+        BleServiceFetchException(deviceId.id, deviceId.name, causedBy: e), t);
   }
 }
 
@@ -696,14 +698,11 @@ class BleServicesFor extends _$BleServicesFor {
 class BleCharacteristicsFor extends _$BleCharacteristicsFor {
   @override
   Future<List<BleCharacteristic>> build(
-      {required BleUUID serviceUuid,
-      required String deviceId,
-      required String deviceName}) async {
+      {required BleUUID serviceUuid, required BleDeviceId deviceId}) async {
     final completer = Completer<List<BleCharacteristic>>();
 
     try {
-      ref.listen(bleServicesForProvider(deviceId, deviceName),
-          (previous, next) {
+      ref.listen(bleServicesForProvider(deviceId), (previous, next) {
         next.when(
           loading: () {},
           data: (data) async {
@@ -712,11 +711,11 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
             if (service.isNotEmpty) {
               try {
                 final nativeResults = await _ble.characteristicsFor(
-                    serviceUuid, deviceId, deviceName);
+                    serviceUuid, deviceId.id, deviceId.name);
                 final results = nativeResults
                     .map(
                       (e) => _ble.bleCharacteristicFrom(
-                          e, deviceName, serviceUuid, deviceId),
+                          e, deviceId.name, serviceUuid, deviceId.id),
                     )
                     .toList();
                 _logger
@@ -726,7 +725,7 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
                 _fail(e, t);
               }
             } else {
-              throw UnknownService(serviceUuid, deviceId, deviceName,
+              throw UnknownService(serviceUuid, deviceId.id, deviceId.name,
                   reason: "Getting characteristics");
             }
           },
@@ -743,8 +742,8 @@ class BleCharacteristicsFor extends _$BleCharacteristicsFor {
   _fail(e, t) {
     state = AsyncError(
         CharacteristicsDiscoverException(
-            deviceId: deviceId,
-            deviceName: deviceName,
+            deviceId: deviceId.id,
+            deviceName: deviceId.name,
             serviceUuid: serviceUuid,
             causedBy: e),
         t);
@@ -758,21 +757,19 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
   Future<BleCharacteristic> build({
     required BleUUID characteristicUuid,
     required BleUUID serviceUuid,
-    required String deviceId,
-    required String deviceName,
+    required BleDeviceId deviceId,
   }) async {
     final completer = Completer<BleCharacteristic>();
 
     try {
-      ref.listen(bleServicesForProvider(deviceId, deviceName),
-          (previous, next) {
+      ref.listen(bleServicesForProvider(deviceId), (previous, next) {
         next.when(
           data: (services) async {
             final s = services.where((e) => e.serviceUuid == serviceUuid);
 
             if (s.isEmpty) {
               state = AsyncError(
-                UnknownService(serviceUuid, deviceId, deviceName),
+                UnknownService(serviceUuid, deviceId.id, deviceId.name),
                 StackTrace.current,
               );
             } else {
@@ -780,11 +777,11 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
                 final c = await _ble.characteristicFor(
                   characteristicUuid,
                   serviceUuid,
-                  deviceId,
-                  deviceName,
+                  deviceId.id,
+                  deviceId.name,
                 );
                 state = AsyncData(_ble.bleCharacteristicFrom(
-                    c, deviceName, serviceUuid, deviceId));
+                    c, deviceId.name, serviceUuid, deviceId.id));
               } catch (e, t) {
                 state = AsyncError(_fail(e), t);
               }
@@ -804,8 +801,8 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
 
   Future<void> write(List<int> value) {
     return _ble.writeCharacteristic(
-        deviceId: deviceId,
-        deviceName: deviceName,
+        deviceId: deviceId.id,
+        deviceName: deviceId.name,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
         value: value);
@@ -816,8 +813,8 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
       causedBy: e,
       characteristicUuid: characteristicUuid,
       serviceUuid: serviceUuid,
-      deviceId: deviceId,
-      deviceName: deviceName);
+      deviceId: deviceId.id,
+      deviceName: deviceId.name);
 }
 
 /// Return the value of a characteristic
@@ -825,8 +822,7 @@ class BleCharacteristicFor extends _$BleCharacteristicFor {
 class BleCharacteristicValue extends _$BleCharacteristicValue {
   @override
   Future<BleRawValue> build({
-    required String deviceId,
-    required String deviceName,
+    required BleDeviceId deviceId,
     required BleUUID serviceUuid,
     required characteristicUuid,
   }) async {
@@ -837,14 +833,13 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
           bleCharacteristicForProvider(
               characteristicUuid: characteristicUuid,
               serviceUuid: serviceUuid,
-              deviceId: deviceId,
-              deviceName: deviceName), (previous, next) {
+              deviceId: deviceId), (previous, next) {
         next.maybeWhen(
           data: (characteristic) async {
             try {
               final value = await _ble.readCharacteristic(
-                deviceId: deviceId,
-                deviceName: deviceName,
+                deviceId: deviceId.id,
+                deviceName: deviceId.name,
                 serviceUuid: serviceUuid,
                 characteristicUuid: characteristicUuid,
               );
@@ -869,8 +864,8 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
           causedBy: e,
           characteristicUuid: characteristicUuid,
           serviceUuid: serviceUuid,
-          deviceId: deviceId,
-          deviceName: deviceName,
+          deviceId: deviceId.id,
+          deviceName: deviceId.name,
         ),
         t);
   }
@@ -883,8 +878,7 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
 
   @override
   Future<BleRawValue> build({
-    required String deviceId,
-    required String deviceName,
+    required BleDeviceId deviceId,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
   }) async {
@@ -899,8 +893,8 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
             notify: false,
             characteristicUuid: characteristicUuid,
             serviceUuid: serviceUuid,
-            deviceId: deviceId,
-            deviceName: deviceName,
+            deviceId: deviceId.id,
+            deviceName: deviceId.name,
           );
         }
       },
@@ -911,8 +905,7 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
         bleCharacteristicForProvider(
             characteristicUuid: characteristicUuid,
             serviceUuid: serviceUuid,
-            deviceId: deviceId,
-            deviceName: deviceName),
+            deviceId: deviceId),
         (previous, next) {
           next.when(
             data: (c) async {
@@ -921,8 +914,8 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
                   notify: true,
                   characteristicUuid: characteristicUuid,
                   serviceUuid: serviceUuid,
-                  deviceId: deviceId,
-                  deviceName: deviceName,
+                  deviceId: deviceId.id,
+                  deviceName: deviceId.name,
                 );
 
                 final s = _notifications;
@@ -951,8 +944,8 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
         causedBy: e,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
-        deviceId: deviceId,
-        deviceName: deviceName,
+        deviceId: deviceId.id,
+        deviceName: deviceId.name,
         reason: e.toString(),
       );
 }
@@ -972,8 +965,7 @@ BleValue convertBleRawValue(BleRawValue raw, [BlePresentationFormat? f]) {
 class BleDescriptorsFor extends _$BleDescriptorsFor {
   @override
   Future<List<BleDescriptor>> build({
-    required String deviceId,
-    required String deviceName,
+    required BleDeviceId deviceId,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
   }) async {
@@ -983,7 +975,6 @@ class BleDescriptorsFor extends _$BleDescriptorsFor {
       ref.listen(
         bleCharacteristicForProvider(
           deviceId: deviceId,
-          deviceName: deviceName,
           serviceUuid: serviceUuid,
           characteristicUuid: characteristicUuid,
         ),
@@ -992,7 +983,10 @@ class BleDescriptorsFor extends _$BleDescriptorsFor {
               data: (characteristic) async {
                 try {
                   state = AsyncData(await _ble.bleDescriptorsFor(
-                      characteristicUuid, serviceUuid, deviceId, deviceName));
+                      characteristicUuid,
+                      serviceUuid,
+                      deviceId.id,
+                      deviceId.name));
                 } catch (e, t) {
                   _fail(e, t);
                 }
@@ -1012,8 +1006,8 @@ class BleDescriptorsFor extends _$BleDescriptorsFor {
   _fail(error, t) {
     state = AsyncError(
         GetDescriptorsException(
-          deviceId: deviceId,
-          name: deviceName,
+          deviceId: deviceId.id,
+          name: deviceId.name,
           serviceUuid: serviceUuid,
           characteristicUuid: characteristicUuid,
           causedBy: error,
@@ -1027,14 +1021,13 @@ class BleDescriptorsFor extends _$BleDescriptorsFor {
 class BleDescriptorFor extends _$BleDescriptorFor {
   @override
   Future<BleDescriptor> build({
-    required String deviceId,
-    required String deviceName,
+    required BleDeviceId deviceId,
     required BleUUID serviceUuid,
     required BleUUID characteristicUuid,
     required BleUUID descriptorUuid,
   }) async {
-    return Future.value(_ble.bleDescriptorFor(
-        descriptorUuid, characteristicUuid, serviceUuid, deviceId, deviceName));
+    return Future.value(_ble.bleDescriptorFor(descriptorUuid,
+        characteristicUuid, serviceUuid, deviceId.id, deviceId.name));
   }
 }
 
@@ -1043,8 +1036,7 @@ class BleDescriptorFor extends _$BleDescriptorFor {
 class BleDescriptorValue extends _$BleDescriptorValue {
   @override
   Future<List<int>> build(
-    String deviceId,
-    String deviceName,
+    BleDeviceId deviceId,
     BleUUID serviceUuid,
     BleUUID characteristicUuid,
     BleUUID descriptorUuid,
@@ -1055,7 +1047,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
       _logger.fine("bleDescriptorValue: start $descriptorUuid");
 
       ref.listen(
-        bleServicesForProvider(deviceId, deviceName),
+        bleServicesForProvider(deviceId),
         (previous, next) {
           next.when(
             data: (services) async {
@@ -1065,7 +1057,7 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                 final s = services.where((e) => e.serviceUuid == serviceUuid);
 
                 if (s.isEmpty) {
-                  throw UnknownService(serviceUuid, deviceId, deviceName,
+                  throw UnknownService(serviceUuid, deviceId.id, deviceId.name,
                       reason: "Reading descriptor $descriptorUuid");
                 }
 
@@ -1077,14 +1069,13 @@ class BleDescriptorValue extends _$BleDescriptorValue {
                         characteristicUuid: characteristicUuid,
                         serviceUuid: serviceUuid,
                         deviceId: deviceId,
-                        deviceName: deviceName,
                       ), (previous, next) {
                     next.maybeWhen(
                       data: (characteristic) async {
                         try {
                           final value = await _ble.readDescriptor(
-                              deviceId: deviceId,
-                              name: deviceName,
+                              deviceId: deviceId.id,
+                              name: deviceId.name,
                               serviceUuid: serviceUuid,
                               characteristicUuid: characteristicUuid,
                               descriptorUuid: descriptorUuid);
@@ -1123,8 +1114,8 @@ class BleDescriptorValue extends _$BleDescriptorValue {
       CharacteristicException(
           characteristicUuid: characteristicUuid,
           serviceUuid: serviceUuid,
-          deviceId: deviceId,
-          deviceName: deviceName,
+          deviceId: deviceId.id,
+          deviceName: deviceId.name,
           reason: 'Reading descriptor value',
           causedBy: e),
       t);

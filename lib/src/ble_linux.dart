@@ -220,8 +220,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
     return BleScannedDevice(
       BleDevice.scanned(
-        deviceId: device.address,
-        name: device.name,
+        deviceId: BleDeviceId(device.address, device.name),
         manufacturerData: device.manufacturerData
             .map((key, value) => MapEntry(key.id, value)),
         serviceData: device.serviceData
@@ -289,7 +288,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
 
     try {
       await nativeDevice.connect();
-      return bleDeviceFor(nativeDevice);
+      return bleDeviceFor(nativeDevice, deviceName);
     } catch (e) {
       throw BleConnectionException(deviceId, deviceName, "Could not connect",
           causedBy: e);

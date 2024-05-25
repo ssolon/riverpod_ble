@@ -156,8 +156,7 @@ class BleWinBle
         _devicesSeen.add(
           BleScannedDevice(
             BleDevice.scanned(
-              deviceId: event.address,
-              name: event.name,
+              deviceId: BleDeviceId(event.address, event.name),
               services: event.serviceUuids.map((e) => BleUUID(e)).toList(),
             ),
             int.parse(event.rssi),
@@ -306,7 +305,7 @@ class BleWinBle
             // Stop listening since this is a one-shot
             connectionSubscription?.cancel();
 
-            completer.complete(bleDeviceFor(device));
+            completer.complete(bleDeviceFor(device, deviceName));
           },
         );
       } catch (e, t) {
