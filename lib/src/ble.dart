@@ -875,6 +875,7 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
 @riverpod
 class BleCharacteristicNotification extends _$BleCharacteristicNotification {
   Stream<List<int>>? _notifications;
+  StreamSubscription? _connectionStatusSubscription;
 
   @override
   Future<BleRawValue> build({
@@ -888,6 +889,8 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
       () async {
         _logger.fine(
             "bleCharacteristicNotificationProvider: dispose $characteristicUuid");
+        // FIXME: Should only stop notifications if we're connected
+        // FIXME: Or maybe just ignore exceptions?
         if (_notifications != null) {
           await _ble.setNotifyCharacteristic(
             notify: false,
@@ -901,6 +904,9 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
     );
 
     try {
+      // FIXME: Some sort of recovery if we can't connect the first time?
+      // FIXME: Maybe we should be listening to the connection status
+      //        and only start notifications when we're connected?
       ref.listen(
         bleCharacteristicForProvider(
             characteristicUuid: characteristicUuid,
@@ -910,20 +916,38 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
           next.when(
             data: (c) async {
               try {
-                _notifications = await _ble.setNotifyCharacteristic(
-                  notify: true,
-                  characteristicUuid: characteristicUuid,
-                  serviceUuid: serviceUuid,
-                  deviceId: deviceId.id,
-                  deviceName: deviceId.name,
-                );
+                _connectionStatusSubscription ??= _ble
+                    .connectionStreamFor(deviceId.id, deviceId.name)
+                    .listen((event) async {
+                  _logger
+                      .info("BleCharacteristicNotification: $event $deviceId");
+                  if (event == BleConnectionState.disconnected()) {
+                    state = AsyncError(
+                      BleConnectionException(
+                        deviceId.id,
+                        deviceId.name,
+                        "Device disconnected",
+                      ),
+                      StackTrace.current,
+                    );
+                  } else if (event == BleConnectionState.connected()) {
+                    // Start notifications
+                    _notifications = await _ble.setNotifyCharacteristic(
+                      notify: true,
+                      characteristicUuid: characteristicUuid,
+                      serviceUuid: serviceUuid,
+                      deviceId: deviceId.id,
+                      deviceName: deviceId.name,
+                    );
 
-                final s = _notifications;
-                if (s != null) {
-                  await for (final v in s) {
-                    state = AsyncData(BleRawValue(values: v));
+                    final s = _notifications;
+                    if (s != null) {
+                      await for (final v in s) {
+                        state = AsyncData(BleRawValue(values: v));
+                      }
+                    }
                   }
-                }
+                });
               } catch (e, t) {
                 state = AsyncError(_fail(e), t);
               }
