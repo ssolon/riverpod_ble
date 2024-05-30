@@ -6,17 +6,20 @@ import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:mutex/mutex.dart';
-import 'package:riverpod_ble/src/states/ble_scan_result.dart';
 import '../riverpod_ble.dart';
 
 final _logger = Logger("FlutterBluePlusBle");
+
+/// We wrap the [connectionStream] so we can add the service discovery
+/// after the connection is made.
+final Map<String, Stream<BleConnectionState>> _connectionStreams = {};
 
 class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
     BluetoothCharacteristic, BluetoothDescriptor> {
   FlutterBluePlusBle() {
     // TODO Make this settable somewhere
     // TODO This needs to happen after bluetooth is initialized?
-    FlutterBluePlus.setLogLevel(LogLevel.info);
+    FlutterBluePlus.setLogLevel(LogLevel.debug);
   }
 
   @override
@@ -130,11 +133,22 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   @override
   Stream<BleConnectionState> connectionStreamFor(
       String deviceId, String deviceName) {
-    return deviceFor(deviceId, deviceName).connectionState.transform(
-          StreamTransformer.fromHandlers(
-            handleData: (data, sink) => sink.add(_connectionStateFrom(data)),
-          ),
-        );
+    final device = deviceFor(deviceId, deviceName);
+    return _connectionStreams.putIfAbsent(deviceId, () {
+      return device.connectionState.asyncMap((s) async {
+        final bleState = _connectionStateFrom(s);
+        if (bleState == BleConnectionState.connected()) {
+          // We need to wait for the services to be discovered
+          // after connection so we'll do it here so that any consumers of
+          // the stream will have the services available.
+          _logger.info("Discovering services for $deviceId");
+          await device.discoverServices();
+          _logger.info("Services discovered for $deviceId");
+        }
+
+        return bleState;
+      });
+    });
   }
 
   @override
@@ -160,22 +174,42 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
     final connected = await connectedDevices();
     _logger.fine("_ble.isConnected checking ${connected.length} devices");
     return connected.any(
-      (e) => e.maybeMap((v) => v.deviceId == deviceId, orElse: () => false),
+      (e) => e.maybeMap((v) => v.deviceId.id == deviceId, orElse: () => false),
     );
   }
 
   @override
   Future<BleDevice> connectTo(String deviceId, String deviceName,
       {List<String> services = const <String>[]}) async {
+    final completer = Completer<BleDevice>();
     final native = deviceFor(deviceId, deviceName);
-    await native.connect();
+    StreamSubscription<BleConnectionState>? subscription;
 
-    // Version 1.28.9 no long clears services on disconnect or reconnect
-    // so we'll always do the discover here
-    // We'll probably need it anyway!
-    await native.discoverServices();
+    try {
+      subscription = connectionStreamFor(deviceId, deviceName).listen(
+        (state) {
+          if (state == BleConnectionState.connected()) {
+            completer.complete(bleDeviceFor(deviceFor(deviceId, deviceName)));
+            subscription?.cancel();
+          }
+        },
+        onError: (e) {
+          completer.completeError(e);
+          subscription?.cancel();
+        },
+        onDone: () {
+          completer.completeError(BleConnectionException(
+              deviceId, deviceName, 'Connection done without connection'));
+        },
+      );
 
-    return Future.value(bleDeviceFor(native, deviceName));
+      native.connect();
+      return completer.future;
+    } catch (e) {
+      subscription?.cancel();
+      return Future.error(
+          BleConnectionException(deviceId, deviceName, '', causedBy: e));
+    }
   }
 
   @override
