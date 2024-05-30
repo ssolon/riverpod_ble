@@ -612,6 +612,11 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
               _logger.fine("BleConnectionMonitor: stream $s");
               state = AsyncData(s);
             }
+
+            // TODO: What does it mean to get here?
+            // Should we do some sort of reset of ourselves to possibley
+            // restart listening? (Seems to have a been a problem on Linux
+            // but not easily reproducible).
           }
         },
         loading: () => state = const AsyncLoading(),
@@ -875,7 +880,6 @@ class BleCharacteristicValue extends _$BleCharacteristicValue {
 @riverpod
 class BleCharacteristicNotification extends _$BleCharacteristicNotification {
   Stream<List<int>>? _notifications;
-  StreamSubscription? _connectionStatusSubscription;
 
   @override
   Future<BleRawValue> build({
@@ -891,7 +895,8 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
             "bleCharacteristicNotificationProvider: dispose $characteristicUuid");
         // FIXME: Should only stop notifications if we're connected
         // FIXME: Or maybe just ignore exceptions?
-        if (_notifications != null) {
+        if (_notifications != null &&
+            await _ble.isConnected(deviceId.id, deviceId.name)) {
           await _ble.setNotifyCharacteristic(
             notify: false,
             characteristicUuid: characteristicUuid,
@@ -904,55 +909,29 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
     );
 
     try {
-      _connectionStatusSubscription ??= _ble
-          .connectionStreamFor(deviceId.id, deviceId.name)
-          .listen((event) async {
-        _logger.info("BleCharacteristicNotification: event=$event");
-        if (event == BleConnectionState.connected()) {
-          _logger.info("BleCharacteristicNotification: connected $deviceId");
-          _onConnected();
-        } else if (event == BleConnectionState.disconnected()) {
-          _logger.info("BleCharacteristicNotification: disconnected $deviceId");
-          state = AsyncError(
-            BleConnectionException(
-              deviceId.id,
-              deviceId.name,
-              "BleCharacteristicNotification: Device disconnected",
-            ),
-            StackTrace.current,
-          );
-        } else {
-          _logger.info(
-              "BleCharacteristicNotification: unknown event=$event $deviceId");
-          state = AsyncError(
-            BleConnectionException(
-              deviceId.id,
-              deviceId.name,
-              "BleCharacteristicNotification: Unknown connection state",
-            ),
-            StackTrace.current,
-          );
-        }
-      }, onError: (e) {
-        state = AsyncError(
-          BleConnectionException(
-            deviceId.id,
-            deviceId.name,
-            "BleCharacteristicNotification: Connection status error",
-            causedBy: e,
-          ),
-          StackTrace.current,
+      ref.listen(bleConnectionMonitorProvider(deviceId), (previous, next) {
+        next.when(
+          data: (data) async {
+            if (data == BleConnectionState.connected()) {
+              _onConnected();
+            }
+          },
+          loading: () {},
+          error: (error, stackTrace) {
+            state = AsyncError(
+                BleConnectionException(deviceId.id, deviceId.name, 'Connecting',
+                    causedBy: error),
+                stackTrace);
+          },
         );
-      }, onDone: () {
-        _logger.info("BleCharacteristicNotification: done");
-      });
+      }, fireImmediately: true);
     } catch (e, t) {
       state = AsyncError(_fail(e), t);
     }
 
-    if (await _ble.isConnected(deviceId.id, deviceId.name)) {
-      _onConnected();
-    }
+    // if (await _ble.isConnected(deviceId.id, deviceId.name)) {
+    // _onConnected();
+    // }
 
     return completer.future;
   }
