@@ -92,11 +92,11 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
     _propertiesChangedSubscription = _adapter?.propertiesChanged.listen(
       (events) {
         for (final event in events) {
-          _log.finer("Property changed=$event");
+          _log.finer("Adapter Property changed=$event");
           switch (event) {
             case 'Discovering':
               final discovering = _adapter?.discovering ?? false;
-              _log.finer('Discovering=$discovering');
+              _log.finer('Adaptper property Discovering=$discovering');
               _scannerStatusStreamController.add(discovering);
               _isScanning = discovering;
               break;
@@ -107,7 +107,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
               break;
 
             default:
-              _log.warning('Unhandled property changed event: $event');
+              _log.warning('Unhandled adapter property changed event: $event');
           }
         }
       },
@@ -379,8 +379,12 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
         List<BleConnectionState> states = [];
 
         for (final property in properties) {
+          _log.finer(
+              "connectionStreamFor $deviceId property changed: $property");
           if (property == "Connected") {
-            states.add(nativeDevice.connected
+            final connected = nativeDevice.connected;
+            _log.finer("connectionStreamFor $deviceId connected=$connected");
+            states.add(connected
                 ? BleConnectionState.connected()
                 : BleConnectionState.disconnected());
           }
@@ -389,6 +393,7 @@ class LinuxBle extends Ble<BlueZDevice, BlueZGattService,
         return states;
       });
     } else {
+      _log.finer("connectionStreamFor: Device $deviceId not found");
       return const Stream<BleConnectionState>.empty();
     }
   }
