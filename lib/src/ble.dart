@@ -904,9 +904,61 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
     );
 
     try {
-      // FIXME: Some sort of recovery if we can't connect the first time?
-      // FIXME: Maybe we should be listening to the connection status
-      //        and only start notifications when we're connected?
+      _connectionStatusSubscription ??= _ble
+          .connectionStreamFor(deviceId.id, deviceId.name)
+          .listen((event) async {
+        _logger.info("BleCharacteristicNotification: event=$event");
+        if (event == BleConnectionState.connected()) {
+          _logger.info("BleCharacteristicNotification: connected $deviceId");
+          _onConnected();
+        } else if (event == BleConnectionState.disconnected()) {
+          _logger.info("BleCharacteristicNotification: disconnected $deviceId");
+          state = AsyncError(
+            BleConnectionException(
+              deviceId.id,
+              deviceId.name,
+              "BleCharacteristicNotification: Device disconnected",
+            ),
+            StackTrace.current,
+          );
+        } else {
+          _logger.info(
+              "BleCharacteristicNotification: unknown event=$event $deviceId");
+          state = AsyncError(
+            BleConnectionException(
+              deviceId.id,
+              deviceId.name,
+              "BleCharacteristicNotification: Unknown connection state",
+            ),
+            StackTrace.current,
+          );
+        }
+      }, onError: (e) {
+        state = AsyncError(
+          BleConnectionException(
+            deviceId.id,
+            deviceId.name,
+            "BleCharacteristicNotification: Connection status error",
+            causedBy: e,
+          ),
+          StackTrace.current,
+        );
+      }, onDone: () {
+        _logger.info("BleCharacteristicNotification: done");
+      });
+    } catch (e, t) {
+      state = AsyncError(_fail(e), t);
+    }
+
+    if (await _ble.isConnected(deviceId.id, deviceId.name)) {
+      _onConnected();
+    }
+
+    return completer.future;
+  }
+
+  _onConnected() async {
+    try {
       ref.listen(
         bleCharacteristicForProvider(
             characteristicUuid: characteristicUuid,
@@ -916,38 +968,20 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
           next.when(
             data: (c) async {
               try {
-                _connectionStatusSubscription ??= _ble
-                    .connectionStreamFor(deviceId.id, deviceId.name)
-                    .listen((event) async {
-                  _logger
-                      .info("BleCharacteristicNotification: $event $deviceId");
-                  if (event == BleConnectionState.disconnected()) {
-                    state = AsyncError(
-                      BleConnectionException(
-                        deviceId.id,
-                        deviceId.name,
-                        "Device disconnected",
-                      ),
-                      StackTrace.current,
-                    );
-                  } else if (event == BleConnectionState.connected()) {
-                    // Start notifications
-                    _notifications = await _ble.setNotifyCharacteristic(
-                      notify: true,
-                      characteristicUuid: characteristicUuid,
-                      serviceUuid: serviceUuid,
-                      deviceId: deviceId.id,
-                      deviceName: deviceId.name,
-                    );
+                _notifications = await _ble.setNotifyCharacteristic(
+                  notify: true,
+                  characteristicUuid: characteristicUuid,
+                  serviceUuid: serviceUuid,
+                  deviceId: deviceId.id,
+                  deviceName: deviceId.name,
+                );
 
-                    final s = _notifications;
-                    if (s != null) {
-                      await for (final v in s) {
-                        state = AsyncData(BleRawValue(values: v));
-                      }
-                    }
+                final s = _notifications;
+                if (s != null) {
+                  await for (final v in s) {
+                    state = AsyncData(BleRawValue(values: v));
                   }
-                });
+                }
               } catch (e, t) {
                 state = AsyncError(_fail(e), t);
               }
@@ -961,7 +995,6 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
     } catch (e, t) {
       state = AsyncError(_fail(e), t);
     }
-    return completer.future;
   }
 
   _fail(e) => FailedToEnableNotification(
