@@ -929,10 +929,6 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
       state = AsyncError(_fail(e), t);
     }
 
-    // if (await _ble.isConnected(deviceId.id, deviceId.name)) {
-    // _onConnected();
-    // }
-
     return completer.future;
   }
 
