@@ -141,13 +141,11 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
           // We need to wait for the services to be discovered
           // after connection so we'll do it here so that any consumers of
           // the stream will have the services available.
-          _logger.info("Discovering services for $deviceId");
           await device.discoverServices();
-          _logger.info("Services discovered for $deviceId");
         }
 
         return bleState;
-      });
+      }).asBroadcastStream();
     });
   }
 
