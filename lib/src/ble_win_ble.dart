@@ -299,13 +299,14 @@ class BleWinBle
       try {
         connectionSubscription = device.connectionStream.listen(
           (event) {
-            //TODO  What about re-connection and old stuff in the queue?
-            // For now just complete based on whatever comes in
+            logger.fine("connectTo: connection event=$event");
 
-            // Stop listening since this is a one-shot
-            connectionSubscription?.cancel();
+            if (event == BleConnectionState.connected()) {
+              // Stop listening since this is a one-shot
+              connectionSubscription?.cancel();
 
-            completer.complete(bleDeviceFor(device, deviceName));
+              completer.complete(bleDeviceFor(device, deviceName));
+            }
           },
         );
       } catch (e, t) {
