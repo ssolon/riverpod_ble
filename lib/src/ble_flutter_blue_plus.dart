@@ -1,6 +1,7 @@
 /// FlutterBluePlus variation
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
@@ -138,10 +139,20 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
       return device.connectionState.asyncMap((s) async {
         final bleState = _connectionStateFrom(s);
         if (bleState == BleConnectionState.connected()) {
+          //
           // We need to wait for the services to be discovered
           // after connection so we'll do it here so that any consumers of
           // the stream will have the services available.
           await device.discoverServices();
+
+          // It looks like names are only setup by scanning or a
+          // get of (system|bonded)Devices call so we'll do that here in case
+          // we didn't do a scan.
+          await FlutterBluePlus.systemDevices;
+
+          if (Platform.isAndroid) {
+            await FlutterBluePlus.bondedDevices;
+          }
         }
 
         return bleState;
