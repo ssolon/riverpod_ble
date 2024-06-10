@@ -605,19 +605,28 @@ class BleConnectionMonitor extends _$BleConnectionMonitor {
           // Listen to status stream for changes if we haven't already set this
           // up
 
-          if (states == null) {
-            states = _ble.connectionStreamFor(deviceId.id, deviceId.name);
+          try {
+            if (states == null) {
+              states = _ble.connectionStreamFor(deviceId.id, deviceId.name);
 
-            await for (final s in states!) {
-              _logger.fine("BleConnectionMonitor: stream $s");
-              state = AsyncData(s);
+              // FIXME: An exception thrown will cause the stream to close
+              // and we won't get any more updates. We should probably
+              // handle this better by using a listen loop.
+              await for (final s in states!) {
+                _logger.fine("BleConnectionMonitor: stream $s");
+                state = AsyncData(s);
+              }
             }
-
-            // TODO: What does it mean to get here?
-            // Should we do some sort of reset of ourselves to possibley
-            // restart listening? (Seems to have a been a problem on Linux
-            // but not easily reproducible).
+          } catch (e, t) {
+            state = AsyncError(
+                BleConnectionException(deviceId.id, deviceId.name, 'Monitoring',
+                    causedBy: e),
+                t);
           }
+          // TODO: What does it mean to get here?
+          // Should we do some sort of reset of ourselves to possibley
+          // restart listening? (Seems to have a been a problem on Linux
+          // but not easily reproducible).
         },
         loading: () => state = const AsyncLoading(),
         error: (error, stackTrace) {
