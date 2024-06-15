@@ -13,13 +13,10 @@ class BleUUID {
       r'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$',
       caseSensitive: false);
 
-  static final validHexStringRegex =
-      RegExp(r'^[0-9a-f]+$', caseSensitive: false);
-
   const BleUUID._(this.str);
 
   /// Create from a [uuidString] which must be in standard UUID format
-  /// or a hex string for a short uuid.
+  /// or a hex string for a short uuid. Leading 0x is optional.
   factory BleUUID(String uuidString) {
     final str = cleanUUIDString(uuidString);
 
@@ -27,12 +24,19 @@ class BleUUID {
       return BleUUID._(str);
     }
 
-    // Check for hex string
-    if (!validateHexString(str)) {
-      throw FormatException("Malformed BleUUID String", str);
+    if (str.trim().toLowerCase().startsWith('0x')) {
+      try {
+        return BleUUID.fromInt(int.parse(str));
+      } catch (e) {
+        throw FormatException("Invalid hex UUID string:$e: $str");
+      }
     }
 
-    return BleUUID.fromInt(int.parse(str, radix: 16));
+    try {
+      return BleUUID.fromInt(int.parse(str, radix: 16));
+    } catch (e) {
+      throw FormatException("Invalid hex UUID string:$e: $str");
+    }
   }
 
   /// Create from integer [shortUUID]
@@ -81,10 +85,5 @@ class BleUUID {
   /// Check [uuidstring] has a valid standard string format
   static bool validateUUID(String uuidString) {
     return validateRegex.hasMatch(uuidString);
-  }
-
-  /// Check [uuidstring] is a valid hex number as string
-  static bool validateHexString(String s) {
-    return validHexStringRegex.hasMatch(s);
   }
 }

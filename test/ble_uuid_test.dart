@@ -30,19 +30,6 @@ void main() {
       const uString = '154383d34195d-448e-b2cb-8854c87a27a5';
       expect(BleUUID.validateUUID(uString), false);
     });
-
-    test('Valid hex strings', () {
-      expect(BleUUID.validateHexString('b'), true, reason: 'b is good');
-      expect(BleUUID.validateHexString('1826'), true, reason: '1826 is good');
-      expect(BleUUID.validateHexString('182f'), true, reason: '182f is good');
-      expect(BleUUID.validateHexString('182F'), true, reason: '182F is good');
-    });
-
-    test('Invalid hex strings', () {
-      expect(BleUUID.validateHexString(''), false, reason: 'empty is bad');
-      expect(BleUUID.validateHexString('Z'), false, reason: 'non-hex is bad');
-      expect(BleUUID.validateHexString('BADY'), false, reason: 'BADY is bad');
-    });
   });
 
   group('CTOR tests', () {
@@ -105,6 +92,14 @@ void main() {
       const u = '00001826-0000-1000-8000-00805f9b34fb';
       final uuid = BleUUID(u);
       final shortUUID = BleUUID('1826');
+      expect(uuid == shortUUID, true, reason: 'Compare regular to short');
+      expect(shortUUID == uuid, true, reason: 'Compare short to regular');
+    });
+
+    test('Short UUID explicit hex string Equality Test', () {
+      const u = '00001826-0000-1000-8000-00805f9b34fb';
+      final uuid = BleUUID(u);
+      final shortUUID = BleUUID('0x1826');
       expect(uuid == shortUUID, true, reason: 'Compare regular to short');
       expect(shortUUID == uuid, true, reason: 'Compare short to regular');
     });
