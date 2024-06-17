@@ -18,8 +18,10 @@ BleValue convertRawValue(BleRawValue rawValue, BlePresentationFormat? f,
     [int valueBitOffset = 0]) {
   f ??= rawValue.format;
   f ??= BlePresentationFormat();
-  final width = f.gattFormat.widthInBits ?? 8;
-  final octets = extractBits(rawValue.values, valueBitOffset, width);
+  final width = f.gattFormat.widthInBits ?? rawValue.values.length * 8;
+  final octets = (valueBitOffset == 0)
+      ? rawValue.values
+      : extractBits(rawValue.values, valueBitOffset, width);
   return f.gattFormat.category.converter(octets, f);
 }
 
