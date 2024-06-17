@@ -20,7 +20,7 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
   FlutterBluePlusBle() {
     // TODO Make this settable somewhere
     // TODO This needs to happen after bluetooth is initialized?
-    FlutterBluePlus.setLogLevel(LogLevel.debug);
+    FlutterBluePlus.setLogLevel(LogLevel.info);
   }
 
   @override
