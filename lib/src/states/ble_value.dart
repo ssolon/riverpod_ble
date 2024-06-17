@@ -1,7 +1,9 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_ble/riverpod_ble.dart';
+import 'package:riverpod_ble/src/ble_bitstring.dart';
 
 part 'ble_value.freezed.dart';
 part 'ble_value.g.dart';
@@ -12,10 +14,13 @@ part 'ble_value.g.dart';
 ///
 /// Note: numeric values are assumed to be little-endian which conforms
 /// to the GATT spec. Some devices don't follow this.
-BleValue convertRawValue(BleRawValue rawValue, BlePresentationFormat? f) {
+BleValue convertRawValue(BleRawValue rawValue, BlePresentationFormat? f,
+    [int valueBitOffset = 0]) {
   f ??= rawValue.format;
   f ??= BlePresentationFormat();
-  return f.gattFormat.category.converter(rawValue.values, f);
+  final width = f.gattFormat.widthInBits ?? 8;
+  final octets = extractBits(rawValue.values, valueBitOffset, width);
+  return f.gattFormat.category.converter(octets, f);
 }
 
 /// Category of values we understand and how to convert them
@@ -37,6 +42,7 @@ enum ConverterCategory {
 BleValue unkownConverter(List<int> values, BlePresentationFormat f) =>
     BleValue(values, f.gattFormat);
 
+// FIXME: How big is a boolean?
 BleValue booleanConverter(List<int> values, BlePresentationFormat f) =>
     BleValue.boolean(values, f.gattFormat, values.isNotEmpty && values[0] != 0);
 
@@ -46,8 +52,11 @@ BleValue textConverter(List<int> values, BlePresentationFormat f) {
   return BleValue.utf(values, f.gattFormat, String.fromCharCodes(chars));
 }
 
-BleValue unsignedConverter(List<int> values, BlePresentationFormat f) =>
-    BleValue.numeric(values, f.gattFormat, toBigEndian(values));
+BleValue unsignedConverter(List<int> values, BlePresentationFormat f) {
+  final width = f.gattFormat.widthInBits;
+  final v = (width == null) ? values : extractBits(values, 0, width);
+  return BleValue.numeric(values, f.gattFormat, toBigEndian(v));
+}
 
 BleValue signedConverter(List<int> values, BlePresentationFormat f) {
   if (values.isEmpty) {
@@ -124,29 +133,29 @@ int uint(List<int> v) => v.reversed.fold(0, (result, b) => result << 8 | b);
 /// section 2.4.1
 enum FormatTypes {
   unknown(0, ConverterCategory.unknown),
-  boolean(1, ConverterCategory.boolean),
-  uint2(2, ConverterCategory.unsignedInteger),
-  uint4(3, ConverterCategory.unsignedInteger),
-  uint8(4, ConverterCategory.unsignedInteger),
-  uint12(5, ConverterCategory.unsignedInteger),
-  uint16(6, ConverterCategory.unsignedInteger),
-  uint24(7, ConverterCategory.unsignedInteger),
-  uint32(8, ConverterCategory.unsignedInteger),
-  uint48(9, ConverterCategory.unsignedInteger),
-  uint64(10, ConverterCategory.unsignedInteger),
-  uint128(11, ConverterCategory.bigInt),
-  sint8(12, ConverterCategory.integer),
-  sint12(13, ConverterCategory.integer),
-  sint16(14, ConverterCategory.integer),
-  sint24(15, ConverterCategory.integer),
-  sint32(16, ConverterCategory.integer),
-  sint48(17, ConverterCategory.integer),
-  sint64(18, ConverterCategory.integer),
-  sint128(19, ConverterCategory.bigInt),
-  float32(20, ConverterCategory.float),
-  float64(21, ConverterCategory.float),
-  medfloat16(22, ConverterCategory.float),
-  medfloat32(23, ConverterCategory.float),
+  boolean(1, ConverterCategory.boolean), // How wide?
+  uint2(2, ConverterCategory.unsignedInteger, 2),
+  uint4(3, ConverterCategory.unsignedInteger, 4),
+  uint8(4, ConverterCategory.unsignedInteger, 8),
+  uint12(5, ConverterCategory.unsignedInteger, 12),
+  uint16(6, ConverterCategory.unsignedInteger, 16),
+  uint24(7, ConverterCategory.unsignedInteger, 24),
+  uint32(8, ConverterCategory.unsignedInteger, 32),
+  uint48(9, ConverterCategory.unsignedInteger, 48),
+  uint64(10, ConverterCategory.unsignedInteger, 64),
+  uint128(11, ConverterCategory.bigInt, 128),
+  sint8(12, ConverterCategory.integer, 8),
+  sint12(13, ConverterCategory.integer, 12),
+  sint16(14, ConverterCategory.integer, 16),
+  sint24(15, ConverterCategory.integer, 24),
+  sint32(16, ConverterCategory.integer, 32),
+  sint48(17, ConverterCategory.integer, 48),
+  sint64(18, ConverterCategory.integer, 64),
+  sint128(19, ConverterCategory.bigInt, 128),
+  float32(20, ConverterCategory.float, 32),
+  float64(21, ConverterCategory.float, 64),
+  medfloat16(22, ConverterCategory.float, 16),
+  medfloat32(23, ConverterCategory.float, 32),
   uint16_2(24, ConverterCategory.unsupported),
   utf8s(25, ConverterCategory.text),
   utf16s(26, ConverterCategory.text),
@@ -155,8 +164,20 @@ enum FormatTypes {
 
   final int value;
   final ConverterCategory category;
-
-  const FormatTypes(this.value, this.category);
+  final int? widthInBits;
+  const FormatTypes(this.value, this.category, [this.widthInBits])
+      : assert(
+            ((identical(category, ConverterCategory.integer) ||
+                        identical(
+                            category, ConverterCategory.unsignedInteger) ||
+                        identical(category, ConverterCategory.bigInt) ||
+                        identical(category, ConverterCategory.float)) &&
+                    (widthInBits != null)) ||
+                identical(category, ConverterCategory.unknown) ||
+                identical(category, ConverterCategory.boolean) ||
+                identical(category, ConverterCategory.text) ||
+                identical(category, ConverterCategory.unsupported),
+            "widthInBits must be provided for numeric categories: $category, $widthInBits");
 }
 
 /// Gatt presentation format from 0x2904 descriptor

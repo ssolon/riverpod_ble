@@ -222,15 +222,15 @@ void main() {
     }
 
     test('Empty values to zero', () => numericTest([], FormatTypes.uint2, 0));
-    test('uint2', () => numericTest([0xd2, 0x04], FormatTypes.uint2, 1234));
-    test('uint4', () => numericTest([0xd2, 0x04], FormatTypes.uint4, 1234));
-    test('uint8', () => numericTest([0xd2, 0x04], FormatTypes.uint8, 1234));
-    test('uint12', () => numericTest([0xd2, 0x04], FormatTypes.uint12, 1234));
-    test('uint16', () => numericTest([0xd2, 0x04], FormatTypes.uint16, 1234));
+    test('uint2', () => numericTest([0xd2, 0x84], FormatTypes.uint2, 2));
+    test('uint4', () => numericTest([0xd2, 0x84], FormatTypes.uint4, 2));
+    test('uint8', () => numericTest([0xd2, 0x84], FormatTypes.uint8, 210));
+    test('uint12', () => numericTest([0xd2, 0x84], FormatTypes.uint12, 1234));
+    test('uint16', () => numericTest([0xd2, 0x84], FormatTypes.uint16, 34002));
     test('uint24',
-        () => numericTest([0x0, 0x00, 0x01], FormatTypes.uint24, 65536));
+        () => numericTest([0x0, 0x00, 0x01, 0xff], FormatTypes.uint24, 65536));
     test('uint32',
-        () => numericTest([0, 0, 0, 1], FormatTypes.uint32, 16777216));
+        () => numericTest([0, 0, 0, 1, 0xff], FormatTypes.uint32, 16777216));
     test(
         'uint48',
         () =>
@@ -246,7 +246,7 @@ void main() {
             FormatTypes.uint128,
             BigInt.parse('1329227995784915872903807060280344576'),
             true));
-    test('sint8', () => numericTest([0xfb], FormatTypes.sint8, -5));
+    test('sint8', () => numericTest([0xfb, 0xff], FormatTypes.sint8, -5));
     test('sint12', () => numericTest([0x2e, 0xfb], FormatTypes.sint12, -1234));
     test('sint16', () => numericTest([0x2e, 0xfb], FormatTypes.sint16, -1234));
     test('sint24',
