@@ -19,6 +19,8 @@ library ble_bitstring;
 /// The list is padded with zeros if the number of bits is not a multiple of 8
 /// or if the extracted bits go beyond the end of the input list.
 ///
+// FIXME: Handle null [numBits] and compute it from the length of the list
+//        and [startBit].
 List<int> extractBits(List<int> bits, int startBit, int numBits) {
 // Calculate the starting byte index and bit offset within the byte
   int startByteIndex = startBit ~/ 8;
