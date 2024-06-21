@@ -212,7 +212,11 @@ class FlutterBluePlusBle extends Ble<BluetoothDevice, BluetoothService,
         },
       );
 
-      native.connect();
+      native.connect().onError((e, s) {
+        completer.completeError(e ?? "Exception connecting", s);
+        subscription?.cancel();
+      });
+
       return completer.future;
     } catch (e) {
       subscription?.cancel();
