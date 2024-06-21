@@ -216,7 +216,7 @@ class BleRawValue with _$BleRawValue {
 ///
 /// [toString()] is overridden to return the [toString()] of the current value.
 @freezed
-class BleValue with _$BleValue {
+sealed class BleValue with _$BleValue {
   const BleValue._();
 
   factory BleValue(
