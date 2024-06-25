@@ -906,13 +906,17 @@ class BleCharacteristicNotification extends _$BleCharacteristicNotification {
         // FIXME: Or maybe just ignore exceptions?
         if (_notifications != null &&
             await _ble.isConnected(deviceId.id, deviceId.name)) {
-          await _ble.setNotifyCharacteristic(
-            notify: false,
-            characteristicUuid: characteristicUuid,
-            serviceUuid: serviceUuid,
-            deviceId: deviceId.id,
-            deviceName: deviceId.name,
-          );
+          try {
+            await _ble.setNotifyCharacteristic(
+              notify: false,
+              characteristicUuid: characteristicUuid,
+              serviceUuid: serviceUuid,
+              deviceId: deviceId.id,
+              deviceName: deviceId.name,
+            );
+          } catch (e) {
+            _logger.warning("Failed to stop notifications: $deviceId $e");
+          }
         }
       },
     );
